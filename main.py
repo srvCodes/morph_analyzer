@@ -77,7 +77,12 @@ class ProcessAndTokenizeData():
         X_indexed = process_words.get_indexed_words(X, mode='build_vocab')
         y_indexed = process_words.get_indexed_words(y, mode='use_vocab')
         X_indexed_left, X_indexed_right = process_words.ShiftWordsPerCW(X=X, cw=context_window)
-        return [X_indexed, X_indexed_left, X_indexed_right, y_indexed]
+        all_inputs = list()
+        all_inputs.append(X_indexed)
+        all_inputs += X_indexed_left
+        all_inputs += X_indexed_right
+        all_inputs.append(y_indexed)
+        return all_inputs
 
 
 def sequence_padder(in_list, maxlen):
@@ -87,11 +92,9 @@ def sequence_padder(in_list, maxlen):
 
 def pad_all_sequences(indexed_outputs):
     X_indexed, X_indexed_left, X_indexed_right, y_indexed = indexed_outputs
-    max_word_len = max(max([len(word) for word in X_indexed]), max([len(word) for word in y_indexed]))
-    X_indexed_padded, y_indexed_padded = [sequence_padder(each, max_word_len) for each in [X_indexed, y_indexed]]
-    X_indexed_left_padded = [sequence_padder(each, max_word_len) for each in X_indexed_left]
-    X_indexed_right_padded = [sequence_padder(each, max_word_len) for each in X_indexed_right]
-    return [X_indexed_padded, X_indexed_left_padded, X_indexed_right_padded, y_indexed_padded]
+    max_word_len = max(max([len(word) for word in indexed_outputs[0]]), max([len(word) for word in indexed_outputs[-1]]))
+    all_padded_inputs = [sequence_padder(each, max_word_len) for each in indexed_outputs]
+    return all_padded_inputs
 
 
 def main():
