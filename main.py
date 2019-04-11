@@ -10,12 +10,13 @@ import gzip
 
 from collections import Counter, deque
 from argparse import ArgumentParser
-from hindi import extract_word_root_and_feature
+from src.hindi import extract_word_root_and_feature
 import yaml
 from sklearn.preprocessing import LabelEncoder
 from keras.utils import np_utils
-from src import handle_pickles
+from src import handle_pickles, process_words
 from copy import copy, deepcopy
+from keras.preprocessing.sequence import pad_sequences
 
 parser = ArgumentParser(description="Enter --lang = 'hindi' for Hindi and 'urdu' for Urdu; "
                                     "--mode = 'train, test, or predict'")
@@ -73,33 +74,52 @@ class ProcessAndTokenizeData():
     def process_words_and_roots(self, context_window=4):
         X = [item[::-1] for item in self.all_words]
         y = deepcopy(self.all_roots)
+        X_indexed = process_words.get_indexed_words(X, mode='build_vocab')
+        y_indexed = process_words.get_indexed_words(y, mode='use_vocab')
+        X_indexed_left, X_indexed_right = process_words.ShiftWordsPerCW(X=X, cw=context_window)
+        return [X_indexed, X_indexed_left, X_indexed_right, y_indexed]
 
+
+def sequence_padder(in_list, maxlen):
+    out_list = pad_sequences(in_list, maxlen=maxlen, dtype='int32', padding='post')
+    return out_list
+
+
+def pad_all_sequences(indexed_outputs):
+    X_indexed, X_indexed_left, X_indexed_right, y_indexed = indexed_outputs
+    max_word_len = max(max([len(word) for word in X_indexed]), max([len(word) for word in y_indexed]))
+    X_indexed_padded, y_indexed_padded = [sequence_padder(each, max_word_len) for each in [X_indexed, y_indexed]]
+    X_indexed_left_padded = [sequence_padder(each, max_word_len) for each in X_indexed_left]
+    X_indexed_right_padded = [sequence_padder(each, max_word_len) for each in X_indexed_right]
+    return [X_indexed_padded, X_indexed_left_padded, X_indexed_right_padded, y_indexed_padded]
 
 
 def main():
     paths = read_path_configs()
     if LANG == 'hindi':
         if MODE == 'train':
-            # train_data_dir = paths['hdtb']['train']
-            # train_words, train_roots, train_features = \
-            #     extract_word_root_and_feature.get_words_roots_and_features(train_data_dir, n_features=8)
-            # val_data_dir = paths['hdtb']['validation']
-            # val_words, val_roots, val_features = \
-            #     extract_word_root_and_feature.get_words_roots_and_features(val_data_dir, n_features=8)
-            # assert len(train_words) == len(train_roots) == len(train_features[1]), \
-            #     "Length mismatch while flattening train features"
-            # assert len(val_words) == len(val_roots) == len(val_features[1]),\
-            #     "Length mismatch while flattening val features"
-            # # print("words: {}, roots: {}, features: {}".format(words[:5], roots[:5], features[:5]))
-            # train_size, val_size = [len(each) for each in [train_words, val_words]]
-            # print(train_size, val_size)
-            # train_val_words, train_val_roots = [i + j for i,j in zip([train_words, train_roots], [val_words, val_roots])]
-            # train_val_features = [i+j for i,j in zip(train_features, val_features)]
-            # train_data_processor = ProcessAndTokenizeData(n_features=8, words=train_val_words, roots=train_val_roots,
-            #                                               features=train_val_features)
-            # categorized_features = train_data_processor.process_features()
+            train_data_dir = paths['hdtb']['train']
+            train_words, train_roots, train_features = \
+                extract_word_root_and_feature.get_words_roots_and_features(train_data_dir, n_features=8)
+            val_data_dir = paths['hdtb']['validation']
+            val_words, val_roots, val_features = \
+                extract_word_root_and_feature.get_words_roots_and_features(val_data_dir, n_features=8)
+            assert len(train_words) == len(train_roots) == len(train_features[1]), \
+                "Length mismatch while flattening train features"
+            assert len(val_words) == len(val_roots) == len(val_features[1]),\
+                "Length mismatch while flattening val features"
+            # print("words: {}, roots: {}, features: {}".format(words[:5], roots[:5], features[:5]))
+            train_size, val_size = [len(each) for each in [train_words, val_words]]
+            print(train_size, val_size)
+            train_val_words, train_val_roots = [i + j for i,j in zip([train_words, train_roots], [val_words, val_roots])]
+            train_val_features = [i+j for i,j in zip(train_features, val_features)]
+            train_data_processor = ProcessAndTokenizeData(n_features=8, words=train_val_words, roots=train_val_roots,
+                                                          features=train_val_features)
+            categorized_features = train_data_processor.process_features()
             categorized_features = pickle_handler.pickle_loader('categorized_features')
-            print([each[:5] for each in categorized_features])
+            indexed_outputs = train_data_processor.process_words_and_roots(4)
+            padded_indexed_outputs = pad_all_sequences(indexed_outputs)
+
     else:
         print("urdu")
 
