@@ -17,6 +17,9 @@ from keras.utils import np_utils
 from src import handle_pickles, process_words
 from copy import copy, deepcopy
 from keras.preprocessing.sequence import pad_sequences
+from src.models import cnn_rnn_with_context
+from keras.models import Model, load_model
+from keras.callbacks import EarlyStopping, ReduceLROnPlateau, ModelCheckpoint
 
 parser = ArgumentParser(description="Enter --lang = 'hindi' for Hindi and 'urdu' for Urdu; "
                                     "--mode = 'train, test, or predict'")
@@ -26,10 +29,14 @@ args = vars(parser.parse_args())
 pickle_handler= handle_pickles.PickleHandler()
 
 LANG, MODE, = args['lang'], args['mode']
-CONFIG_PATH = 'config/data_paths.yaml'
+CONFIG_PATH = 'config/'
 
-def read_path_configs():
-    with open(CONFIG_PATH, 'r') as stream:
+VOCAB_SIZE = 89
+CONTEXT_WINDOW = 4
+FEATURE_NUMS = 8
+
+def read_path_configs(filename):
+    with open(CONFIG_PATH + filename, 'r') as stream:
         try:
             res = yaml.load(stream)
         except yaml.YAMLError as e:
@@ -60,7 +67,7 @@ class ProcessAndTokenizeData():
                                                                      categorical_features],
                                                       ["dict_of_encoders", "num_of_indiv_features",
                                                        "categorized_features"])]
-            return categorical_features
+            return categorical_features, num_of_indiv_feature_tags
         elif MODE == 'test':
             dict_of_encoders, num_of_indiv_feature_tags = [pickle_handler.pickle_loader(name) for name in
                                                            ["dict_of_encoders", "num_of_indiv_features"]]
@@ -74,8 +81,8 @@ class ProcessAndTokenizeData():
     def process_words_and_roots(self, context_window=4):
         X = [item[::-1] for item in self.all_words]
         y = deepcopy(self.all_roots)
-        X_indexed = process_words.get_indexed_words(X, mode='build_vocab')
-        y_indexed = process_words.get_indexed_words(y, mode='use_vocab')
+        X_indexed = process_words.get_indexed_words(X, mode='build_vocab', vocab_size=VOCAB_SIZE)
+        y_indexed = process_words.get_indexed_words(y, mode='use_vocab', vocab_size=VOCAB_SIZE)
         X_indexed_left, X_indexed_right = process_words.ShiftWordsPerCW(X=X, cw=context_window)
         all_inputs = list()
         all_inputs.append(X_indexed)
@@ -94,34 +101,74 @@ def pad_all_sequences(indexed_outputs):
     X_indexed, X_indexed_left, X_indexed_right, y_indexed = indexed_outputs
     max_word_len = max(max([len(word) for word in indexed_outputs[0]]), max([len(word) for word in indexed_outputs[-1]]))
     all_padded_inputs = [sequence_padder(each, max_word_len) for each in indexed_outputs]
-    return all_padded_inputs
+    return all_padded_inputs, max_word_len
+
+def _create_model(max_word_len, embed_dim, n):
+    model_instance = cnn_rnn_with_context.MorphAnalyzerModels(max_word_len=max_word_len, vocab_len=VOCAB_SIZE,
+                                                              embedding_dim=embed_dim, list_of_feature_nums=n,
+                                                              cw=CONTEXT_WINDOW)
+    compiled_model = model_instance.create_and_compile_model()
+    return compiled_model
+
+def split_train_val(all_data, train_size):
+    train_data = [x[:train_size] for x in all_data]
+    val_data = [x[train_size:] for x in all_data]
+    return train_data, val_data
+
+def get_decoder_input(x_train):
+    x_decoder_input = np.zeros_like(x_train)
+    x_decoder_input[:, 1:] = x_train[:, :-1]
+    x_decoder_input[:, 0] = 1
+    return x_decoder_input
+
+# def one_hot_encode()
+def segregate_inputs_and_outputs(words_and_roots, features, decoder_inputs):
+    roots = words_and_roots[-1]
+    inputs = words_and_roots[:-1]
+    inputs.append(decoder_inputs)
+    outputs = [roots]
+    outputs.append(features)
+    return inputs, outputs
 
 
 def main():
-    paths = read_path_configs()
+    paths = read_path_configs('data_paths.yaml')
     if LANG == 'hindi':
         if MODE == 'train':
             train_data_dir = paths['hdtb']['train']
             train_words, train_roots, train_features = \
-                extract_word_root_and_feature.get_words_roots_and_features(train_data_dir, n_features=8)
+                extract_word_root_and_feature.get_words_roots_and_features(train_data_dir, n_features=FEATURE_NUMS)
             val_data_dir = paths['hdtb']['validation']
             val_words, val_roots, val_features = \
-                extract_word_root_and_feature.get_words_roots_and_features(val_data_dir, n_features=8)
+                extract_word_root_and_feature.get_words_roots_and_features(val_data_dir, n_features=FEATURE_NUMS)
             assert len(train_words) == len(train_roots) == len(train_features[1]), \
                 "Length mismatch while flattening train features"
             assert len(val_words) == len(val_roots) == len(val_features[1]),\
                 "Length mismatch while flattening val features"
             # print("words: {}, roots: {}, features: {}".format(words[:5], roots[:5], features[:5]))
             train_size, val_size = [len(each) for each in [train_words, val_words]]
-            print(train_size, val_size)
             train_val_words, train_val_roots = [i + j for i,j in zip([train_words, train_roots], [val_words, val_roots])]
             train_val_features = [i+j for i,j in zip(train_features, val_features)]
-            train_data_processor = ProcessAndTokenizeData(n_features=8, words=train_val_words, roots=train_val_roots,
+            train_data_processor = ProcessAndTokenizeData(n_features=FEATURE_NUMS, words=train_val_words,
+                                                          roots=train_val_roots,
                                                           features=train_val_features)
-            categorized_features = train_data_processor.process_features()
-            categorized_features = pickle_handler.pickle_loader('categorized_features')
-            indexed_outputs = train_data_processor.process_words_and_roots(4)
-            padded_indexed_outputs = pad_all_sequences(indexed_outputs)
+            categorized_features, n = train_data_processor.process_features()
+            # categorized_features = pickle_handler.pickle_loader('categorized_features')
+            indexed_outputs = train_data_processor.process_words_and_roots(CONTEXT_WINDOW)
+            padded_indexed_outputs, max_word_len = pad_all_sequences(indexed_outputs)
+            params = read_path_configs('model_params')
+            model = _create_model(max_word_len, params['EMBED_DIM'], n)
+            decoder_input = get_decoder_input(padded_indexed_outputs[0])
+            all_inputs, all_outputs = segregate_inputs_and_outputs(padded_indexed_outputs, categorized_features,
+                                                                   decoder_inputs=decoder_input)
+            train_inputs, val_inputs = split_train_val(all_inputs, train_size)
+            train_outputs, val_outputs = split_train_val(all_outputs, train_size)
+            hist = model.fit(train_inputs, train_outputs, validation_data=(val_inputs, val_outputs),
+                             batch_size = params['BATCH_SIZE'], epochs=params['EPOCHS'],
+                             callbacks=[EarlyStopping(patience=10),
+                                        ModelCheckpoint('src/model_weights/model1.hdf5', save_best_only=True,
+                                                        verbose=1, save_weights_only=True)
+                                        ])
 
     else:
         print("urdu")
