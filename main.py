@@ -81,9 +81,10 @@ class ProcessAndTokenizeData():
     def process_words_and_roots(self, context_window=4):
         X = [item[::-1] for item in self.all_words]
         y = deepcopy(self.all_roots)
-        X_indexed = process_words.get_indexed_words(X, mode='build_vocab', vocab_size=VOCAB_SIZE)
-        y_indexed = process_words.get_indexed_words(y, mode='use_vocab', vocab_size=VOCAB_SIZE)
-        X_indexed_left, X_indexed_right = process_words.ShiftWordsPerCW(X=X, cw=context_window)
+        X_indexed = process_words.get_indexed_words(X, mode='build_vocab', vocab_size=VOCAB_SIZE-2)
+        y_indexed = process_words.get_indexed_words(y, mode='use_vocab', vocab_size=VOCAB_SIZE-2)
+        input_shifter = process_words.ShiftWordsPerCW(X=X, cw=context_window, vocab_size=VOCAB_SIZE-2)
+        X_indexed_left, X_indexed_right = input_shifter.shift_input()
         all_inputs = list()
         all_inputs.append(X_indexed)
         all_inputs += X_indexed_left
@@ -98,10 +99,10 @@ def sequence_padder(in_list, maxlen):
 
 
 def pad_all_sequences(indexed_outputs):
-    X_indexed, X_indexed_left, X_indexed_right, y_indexed = indexed_outputs
     max_word_len = max(max([len(word) for word in indexed_outputs[0]]), max([len(word) for word in indexed_outputs[-1]]))
     all_padded_inputs = [sequence_padder(each, max_word_len) for each in indexed_outputs]
     return all_padded_inputs, max_word_len
+
 
 def _create_model(max_word_len, embed_dim, n):
     model_instance = cnn_rnn_with_context.MorphAnalyzerModels(max_word_len=max_word_len, vocab_len=VOCAB_SIZE,
@@ -110,10 +111,12 @@ def _create_model(max_word_len, embed_dim, n):
     compiled_model = model_instance.create_and_compile_model()
     return compiled_model
 
+
 def split_train_val(all_data, train_size):
     train_data = [x[:train_size] for x in all_data]
     val_data = [x[train_size:] for x in all_data]
     return train_data, val_data
+
 
 def get_decoder_input(x_train):
     x_decoder_input = np.zeros_like(x_train)
@@ -121,13 +124,13 @@ def get_decoder_input(x_train):
     x_decoder_input[:, 0] = 1
     return x_decoder_input
 
-# def one_hot_encode()
+
 def segregate_inputs_and_outputs(words_and_roots, features, decoder_inputs):
     roots = words_and_roots[-1]
     inputs = words_and_roots[:-1]
     inputs.append(decoder_inputs)
     outputs = [roots]
-    outputs.append(features)
+    outputs += features
     return inputs, outputs
 
 
@@ -145,9 +148,10 @@ def main():
                 "Length mismatch while flattening train features"
             assert len(val_words) == len(val_roots) == len(val_features[1]),\
                 "Length mismatch while flattening val features"
-            # print("words: {}, roots: {}, features: {}".format(words[:5], roots[:5], features[:5]))
+            # print(len(train_words), len(train_roots), len(train_features[0]))
+            # print("words: {}, roots: {}, features: {}".format(train_words[:5], train_roots[:5], train_features[:5]))
             train_size, val_size = [len(each) for each in [train_words, val_words]]
-            train_val_words, train_val_roots = [i + j for i,j in zip([train_words, train_roots], [val_words, val_roots])]
+            train_val_words, train_val_roots = [train_words + val_words, train_roots + val_roots]
             train_val_features = [i+j for i,j in zip(train_features, val_features)]
             train_data_processor = ProcessAndTokenizeData(n_features=FEATURE_NUMS, words=train_val_words,
                                                           roots=train_val_roots,
@@ -156,13 +160,16 @@ def main():
             # categorized_features = pickle_handler.pickle_loader('categorized_features')
             indexed_outputs = train_data_processor.process_words_and_roots(CONTEXT_WINDOW)
             padded_indexed_outputs, max_word_len = pad_all_sequences(indexed_outputs)
-            params = read_path_configs('model_params')
+            padded_indexed_outputs[-1] = process_words.one_hot_encode_output_data(
+                padded_indexed_outputs[-1], max_word_len, VOCAB_SIZE)
+            params = read_path_configs('model_params.yaml')
             model = _create_model(max_word_len, params['EMBED_DIM'], n)
             decoder_input = get_decoder_input(padded_indexed_outputs[0])
             all_inputs, all_outputs = segregate_inputs_and_outputs(padded_indexed_outputs, categorized_features,
                                                                    decoder_inputs=decoder_input)
             train_inputs, val_inputs = split_train_val(all_inputs, train_size)
             train_outputs, val_outputs = split_train_val(all_outputs, train_size)
+            print(train_outputs[0].shape, val_outputs[0].shape)
             hist = model.fit(train_inputs, train_outputs, validation_data=(val_inputs, val_outputs),
                              batch_size = params['BATCH_SIZE'], epochs=params['EPOCHS'],
                              callbacks=[EarlyStopping(patience=10),

@@ -15,7 +15,7 @@ class ParseFile():
     def read_file(filepath):
         with open(filepath, 'r', encoding='utf-8') as f:
             lines = f.readlines()
-        return lines[:10]
+        return lines[:25]
 
 
     def get_content_from_all_lines(self, lines):
@@ -46,6 +46,7 @@ class ParseFile():
             for i,j in zip(feature[:n_features], all_features[:n_features]):
                 val =  re.sub(r'.*-', '', i)
                 _ = [j.append(val) if len(val) > 0 else j.append('UNK')]
+        print(len(all_features[0]))
         return all_features
 
 
@@ -56,6 +57,7 @@ class ParseFile():
 
 
     def read_dir(self):
+        cnt = 0
         for file in os.listdir(self.path):
             filepath = os.path.join(self.path, file)
             lines = self.read_file(filepath)

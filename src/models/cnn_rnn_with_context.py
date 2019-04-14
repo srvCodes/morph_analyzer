@@ -5,6 +5,7 @@ from keras.layers.recurrent import GRU
 from keras.layers.wrappers import Bidirectional
 from keras.models import Model
 from keras.optimizers import Adadelta
+from keras.constraints import maxnorm
 
 
 class MorphAnalyzerModels():
@@ -25,32 +26,31 @@ class MorphAnalyzerModels():
         self.window = cw
 
     def apply_conv_and_pooling(self, inputs, kernel_size):
-        convolutions = [Conv1D(filters=self.num_filters, kernel_size=kernel_size, padding='valid', activation='relu',
+        convolutions = [Conv1D(filters=self.num_filters, kernel_size=kernel_size, padding='same', activation='relu',
                           strides=self.num_strides, name='Conv' + str(kernel_size) + '_' + str(idx))(noise)
-                        for idx, noise in enumerate(noises)]
+                        for idx, noise in enumerate(inputs)]
         max_pools = [MaxPooling1D(name='MaxPool' + str(kernel_size) + '_' + str(idx))(conv) for idx, conv in
                      enumerate(convolutions)]
         avg_pools = [AveragePooling1D(name='AvgPool' + str(kernel_size) + '_' + str(idx))(conv) for idx, conv in
                      enumerate(convolutions)]
         merged_pools = [merge([i,j], name='Merge_'+str(kernel_size) + "_" + str(idx)) for idx, (i, j) in
-                            enumerate(zip(max_pools, avg_pools))]
+                        enumerate(zip(max_pools, avg_pools))]
         return merged_pools
 
-
-    def apply_embedding(self, input_layers, mask_flag=False):
+    def apply_embedding(self, input_layers, _name, mask_flag=False):
         embedding_layers = [Embedding(self.vocab_size, self.embed_dim, input_length=self.max_len, mask_zero=mask_flag,
-                                      name='embedding_' + str(int(mask_flag)) + '_' + str(idx))(input_layer)
-                            for idx, input_layer in enumerate(input_layers)]
+                                      name='embedding_' + _name + '_' + str(idx))(_input)
+                            for idx, _input in enumerate(input_layers)]
         return embedding_layers
 
     def define_input_layers(self):
-        input_layers = [Input(shape=self.max_len, dtype='float32', name='input' + str(idx)) for idx in
-                        range(self.window + 2)] # 2 = 1(current word) + 1(decoder_input)
+        input_layers = [Input(shape=(self.max_len,), dtype='float32', name='input' + str(idx)) for idx in
+                        range(2*self.window + 2)] # 2 = 1(current word) + 1(decoder_input)
         return input_layers
 
     def cnn_rnn(self):
         input_layers = self.define_input_layers()
-        embedding_layers = self.apply_embedding(input_layers, mask_flag=False)
+        embedding_layers = self.apply_embedding(input_layers, mask_flag=False, _name='common')
         dropouts_1 = [Dropout(self.dropout_rate, name='drop'+str(idx))(embeddings) for idx, embeddings in
                       enumerate(embedding_layers)]
         noises = [GaussianNoise(.05, name='noise'+str(idx))(dropout) for idx, dropout in enumerate(dropouts_1)]
@@ -71,11 +71,11 @@ class MorphAnalyzerModels():
         feature_outputs = [Dense(n, kernel_initializer='he_normal', activation='softmax', name='output'+str(idx))(dropouts_3)
                             for idx, n in enumerate(self.list_of_feature_classes)]
         ################## seq2seq model for root prediction: Luong et. al. (2015) #####################
-        encoder_embedding = self.apply_embedding([input_layers[0]], mask_flag=True)[0] # only on current word now
+        encoder_embedding = self.apply_embedding([input_layers[0]], mask_flag=True, _name='encoder')[0] # only on current word now
         encoder, state = self.rnn(self.rnn_output_size, return_sequences=True, unroll=True, return_state=True,
                              name='encoder')(encoder_embedding)
         encoder_last_state = encoder[:,-1,:]
-        decoder_embedding = self.apply_embedding(input_layers[-1], mask_flag=True)[0]
+        decoder_embedding = self.apply_embedding([input_layers[-1]], mask_flag=True, _name='decoder')[0]
         decoder = self.rnn(self.rnn_output_size, return_sequences=True, unroll=True, name='decoder')(decoder_embedding,
                                                                                                      initial_state=
                                                                                                      [encoder_last_state])
@@ -83,8 +83,10 @@ class MorphAnalyzerModels():
         attention = Activation('softmax', name='attention')(dot_product_1)
         dot_product_2 = dot([attention, encoder], axes=[2,1], name='dot2')
         decoder_context_combined = concatenate([dot_product_2, decoder], name='concatenate')
-        outputs = TimeDistributed(Dense(self.hidden_dim/2, activation='tanh'), name='time_dist_1')(decoder_context_combined)
+        outputs = TimeDistributed(Dense(int(self.hidden_dim/2), activation='tanh'), name='time_dist_1')(decoder_context_combined)
+        print(outputs.shape)
         output_final = TimeDistributed(Dense(self.vocab_size, activation='softmax'), name='time_dist_2')(outputs)
+        print(output_final.shape)
         ################## End of seq2seq model ###########################
         output_layers = [output_final]
         output_layers += feature_outputs
