@@ -24,3 +24,17 @@ For prediction, the test sentences should be provided within `src/hindi/test_dat
 For the test mode, the gold and predicted roots as well as features are all written to separate files within `output/roots.txt, feature_0.txt, ..., feature_6.txt`.
 
 For the predict mode, all the predictions (i.e., roots + features) get written to the same file - `output/predictions.txt`.
+
+
+# Citation
+
+If this repo was helpful in your research, consider citing our work:
+
+```
+@article{jha2018multi,
+  title={Multi Task Deep Morphological Analyzer: Context Aware Joint Morphological Tagging and Lemma Prediction},
+  author={Jha, Saurav and Sudhakar, Akhilesh and Singh, Anil Kumar},
+  journal={arXiv preprint arXiv:1811.08619},
+  year={2018}
+}
+```
