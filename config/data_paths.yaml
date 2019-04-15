@@ -3,3 +3,6 @@ hdtb:
   test: "../HDTB_pre_release_version-0.05/IntraChunk/CoNLL/utf/news_articles_and_heritage/Testing/"
   train:  "../HDTB_pre_release_version-0.05/IntraChunk/CoNLL/utf/news_articles_and_heritage/Training/"
   validation: "../HDTB_pre_release_version-0.05/IntraChunk/CoNLL/utf/news_articles_and_heritage/Development/"
+output: 'output/'
+model_weights: 'src/model_weights/model1.hdf5'
+hindi_test: 'src/hindi/test_data.txt'

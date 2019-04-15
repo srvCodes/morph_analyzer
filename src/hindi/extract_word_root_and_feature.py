@@ -43,10 +43,10 @@ class ParseFile():
         splitted_features = [feature.split('|') for feature in flat_features]
         all_features = [[], [], [], [], [], [], [], []]
         for feature in splitted_features:
-            for i,j in zip(feature[:n_features], all_features[:n_features]):
-                val =  re.sub(r'.*-', '', i)
+            for idx, (i,j) in enumerate(zip(feature[:n_features+1], all_features[:n_features+1])):
+                val = re.sub(r'.*-', '', i)
                 _ = [j.append(val) if len(val) > 0 else j.append('UNK')]
-        print(len(all_features[0]))
+        del all_features[5]
         return all_features
 
 
@@ -71,6 +71,10 @@ def get_words_roots_and_features(path, n_features):
     indiv_features = file_parser.flatten_and_segregate_features(n_features=n_features)
     all_words, all_roots = file_parser.flatten_words_and_roots()
     return all_words, all_roots, indiv_features
+
+def get_words_for_predictions(data_dir):
+    sentences = [line.split() for line in open(data_dir, 'r', encoding='utf-8').readlines()]
+    return sentences
 
 if __name__ == "__main__":
     pass

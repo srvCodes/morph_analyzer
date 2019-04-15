@@ -80,4 +80,5 @@ if __name__ == "__main__":
     X = ['Hello', "am", "I", "Hello"]
     y = ['Hyallo', 'yam', 'yi', 'Hyallo']
     X = [each[::-1] for each in X]
-    get_indexed_words(X, mode='train')
+    res = get_indexed_words(X, vocab_size=4, mode='build_vocab')
+    print(res)
