@@ -25,7 +25,7 @@ CONFIG_PATH = 'config/'
 
 VOCAB_SIZE = 89
 CONTEXT_WINDOW = 4
-FEATURE_NUMS = 7
+FEATURE_NUMS = 6
 
 def read_path_configs(filename):
     with open(CONFIG_PATH + filename, 'r') as stream:
@@ -170,6 +170,29 @@ def write_roots_to_file(words, orig_roots, pred_roots, output_path):
         f.close()
 
 
+def write_predicted_roots_and_features(sentences, predictions, output_path):
+    encoders = pickle_handler.pickle_loader('dict_of_encoders')
+    idx_to_char_mapping = pickle_handler.pickle_loader('index_to_char_mapping')
+    with open(output_path + 'predictions.txt', 'w', encoding='utf-8') as f:
+        f.write("Word\t\tRoot\t\tPOS\t\tGender\t\tNumber\t\tPerson\t\tCase\t\tTAM\n")
+        for sentence, prediction in zip(sentences, predictions):
+            pred_features = [each.tolist() for each in predictions[1:]]
+            pred_transformed_features = [encoders[i].inverse_transform(pred_features[i]) for i in range(FEATURE_NUMS)]
+            pred_sequences = list()
+            for word in prediction:
+                list_of_chars = list()
+                list_of_chars += [idx_to_char_mapping[idx] for idx in word if idx > 0]
+                sequence = ''.join(list_of_chars)
+                pred_sequences.append(sequence)
+            all_outputs = list()
+            all_outputs.append(sentence)
+            all_outputs.append(pred_sequences)
+            all_outputs += pred_transformed_features
+            for each in zip(*all_outputs):
+                f.write('\t\t'.join(each) + '\n')
+            f.write('\n')
+        f.close()
+
 class RemoveErroneousIndices():
     def __init__(self, test_file_contents):
         self.contents = test_file_contents
@@ -177,7 +200,6 @@ class RemoveErroneousIndices():
         self.erroneous_indices = self.get_erroneous_indices()
 
     def filter_erroneous_indices(self, _list):
-        # print("indices: ", self.erroneous_indices)
         _list = [each for i, each in enumerate(_list) if i not in self.erroneous_indices]
         return _list
 
@@ -187,7 +209,7 @@ class RemoveErroneousIndices():
         features = self.contents[-1]
         for i, (feature, label) in enumerate(zip(features, self.class_labels)):
             for idx in range(len(feature)):
-                print("{} {}".format(feature[idx], label))
+                # print("{} {}".format(feature[idx], label))
                 if feature[idx] not in label or (i == 6 and feature[idx] == 'kI'):
                     erroneous_indices.append(idx)
         return erroneous_indices
@@ -288,14 +310,17 @@ def main():
                 padded_indexed_inputs, max_word_len = pad_all_sequences(all_inputs)
                 n = pickle_handler.pickle_loader('num_of_indiv_features')
                 decoder_input = get_decoder_input(padded_indexed_inputs[0])
-                all_inputs.append(decoder_input)
+                padded_indexed_inputs.append(decoder_input)
                 params = read_path_configs('model_params.yaml')
                 model = _create_model(max_word_len, params['EMBED_DIM'], n)
                 model.load_weights(paths['model_weights'])
-                pred_outputs = model.predict(all_inputs)
-                predictions.append(pred_outputs)
-                print(predictions)
-            _ = write_predicted_roots_and_features(sentences, predictions)
+                pred_outputs = model.predict(padded_indexed_inputs)
+                predicted_char_indices = np.argmax(pred_outputs[0], axis=2)
+                predicted_features = [np.argmax(each, axis=1) for each in pred_outputs[1:]]
+                predictions = list()
+                predictions.append(predicted_char_indices)
+                predictions += predicted_features
+            _ = write_predicted_roots_and_features(sentences, predictions, paths['output'])
     else:
         print("urdu")
 

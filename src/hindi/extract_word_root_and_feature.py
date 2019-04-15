@@ -15,7 +15,7 @@ class ParseFile():
     def read_file(filepath):
         with open(filepath, 'r', encoding='utf-8') as f:
             lines = f.readlines()
-        return lines[:25]
+        return lines[:100]
 
 
     def get_content_from_all_lines(self, lines):
@@ -41,7 +41,7 @@ class ParseFile():
     def flatten_and_segregate_features(self, n_features):
         flat_features = [item for sublist in self.sentences_with_features for item in sublist]
         splitted_features = [feature.split('|') for feature in flat_features]
-        all_features = [[], [], [], [], [], [], [], []]
+        all_features = [[], [], [], [], [], [], []]
         for feature in splitted_features:
             for idx, (i,j) in enumerate(zip(feature[:n_features+1], all_features[:n_features+1])):
                 val = re.sub(r'.*-', '', i)

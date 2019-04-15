@@ -1,0 +1,11 @@
+Word		Root		POS		Gender		Number		Person		Case		TAMरेगिस्तान		सााा्ाााा		n		m		sg		3		o		0		NP
+का		का		psp		m		sg		UNK		d		UNK		NP
+मुसाफिर		तिि्तरर		n		m		sg		3		o		0		NP2
+एक		कक		psp		UNK		UNK		UNK		UNK		UNK		NP2
+बूँद		ज		n		any		sg		3		o		0		NP4
+को		कक		psp		m		sg		UNK		d		UNK		NP4
+प्यासा		यंाााा		n		m		sg		3		d		0		NP3
+होता		हहा		v		m		sg		3		UNK		yA		VGF
+है		हश		v		any		sg		3		UNK		0		VGF
+|		।		punc		UNK		UNK		UNK		UNK		UNK		BLK
+
