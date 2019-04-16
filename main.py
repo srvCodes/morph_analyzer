@@ -12,6 +12,7 @@ from sklearn.preprocessing import LabelEncoder
 from src import handle_pickles, process_words
 from src.hindi import extract_word_root_and_feature
 from src.models import cnn_rnn_with_context
+from src.eval import evaluate_and_plot
 
 parser = ArgumentParser(description="Enter --lang = 'hindi' for Hindi and 'urdu' for Urdu; "
                                     "--mode = 'train, test, or predict'")
@@ -45,12 +46,12 @@ class ProcessAndTokenizeData():
     @staticmethod
     def get_counters_for_features(all_features, flag='original'):
         list_of_counters = [Counter(each) for each in all_features]
+        class_labels = [list(each.keys()) for each in list_of_counters]
         if flag == 'original':
-            class_labels = [list(each.keys()) for each in list_of_counters] # dump the labels to be used in filtering test set
             return class_labels
         elif flag == 'transformed':
             num_of_indiv_feature_tags = [max(each_cnt, key=int) + 1 for each_cnt in list_of_counters]
-            return num_of_indiv_feature_tags
+            return class_labels, num_of_indiv_feature_tags
 
     def process_features(self):
         # list_of_counters = [Counter(each) for each in self.all_segregated_features]
@@ -59,16 +60,19 @@ class ProcessAndTokenizeData():
             dict_of_encoders = {i: LabelEncoder() for i in range(self.n_features)}
             encoded_features = [value.fit_transform(self.all_segregated_features[idx]) for idx, value in
                                 dict_of_encoders.items()]
-            class_labels = self.get_counters_for_features(self.all_segregated_features, flag='original')
-            num_of_indiv_feature_tags = self.get_counters_for_features(encoded_features, flag='transformed')
+            class_labels_orig = self.get_counters_for_features(self.all_segregated_features, flag='original')
+            class_labels_transformed, num_of_indiv_feature_tags = self.get_counters_for_features(encoded_features,
+                                                                                                 flag='transformed')
             categorical_features = [np_utils.to_categorical(feature, num_classes=n) for feature, n in
                                     zip(encoded_features, num_of_indiv_feature_tags)]
             _ = [pickle_handler.pickle_dumper(obj, name) for obj, name in zip([dict_of_encoders,
                                                                                num_of_indiv_feature_tags,
                                                                                categorical_features,
-                                                                               class_labels],
+                                                                               class_labels_orig,
+                                                                               class_labels_transformed],
                                                       ["dict_of_encoders", "num_of_indiv_features",
-                                                       "categorized_features", 'class_labels'])]
+                                                       "categorized_features", 'class_labels_orig',
+                                                       'class_labels_transformed'])]
             return categorical_features, num_of_indiv_feature_tags
         elif MODE == 'test':
             dict_of_encoders, num_of_indiv_feature_tags = [pickle_handler.pickle_loader(name) for name in
@@ -168,6 +172,7 @@ def write_roots_to_file(words, orig_roots, pred_roots, output_path):
         for i,j,k in zip(words, orig_roots, pred_sequences):
             f.write(i + '\t\t' + j + '\t\t' + str(k) + '\n')
         f.close()
+    return orig_roots, pred_sequences
 
 
 def write_predicted_roots_and_features(sentences, predictions, output_path):
@@ -196,7 +201,7 @@ def write_predicted_roots_and_features(sentences, predictions, output_path):
 class RemoveErroneousIndices():
     def __init__(self, test_file_contents):
         self.contents = test_file_contents
-        self.class_labels = pickle_handler.pickle_loader('class_labels')
+        self.class_labels = pickle_handler.pickle_loader('class_labels_orig')
         self.erroneous_indices = self.get_erroneous_indices()
 
     def filter_erroneous_indices(self, _list):
@@ -234,6 +239,7 @@ class ProcessDataForModel():
         categorized_features, n = data_processor.process_features()
         indexed_inputs = data_processor.process_words_and_roots(CONTEXT_WINDOW)
         padded_indexed_inputs, max_word_len = pad_all_sequences(indexed_inputs)
+        # print([type(each) for each in padded_indexed_inputs]);
         padded_indexed_inputs[-1] = process_words.one_hot_encode_output_data(
             padded_indexed_inputs[-1], max_word_len, VOCAB_SIZE+2
         )
@@ -293,7 +299,10 @@ def main():
             predicted_char_indices = np.argmax(pred_outputs[0], axis=2)
             predicted_features = [np.argmax(each, axis=1) for each in pred_outputs[1:]]
             _ = write_features_to_file(test_words, all_outputs[1:], predicted_features, paths['output'])
-            _ = write_roots_to_file(test_words, test_roots, predicted_char_indices, paths['output'])
+            root_outputs = write_roots_to_file(test_words, test_roots, predicted_char_indices, paths['output'])
+            evaluator = evaluate_and_plot.EvaluatePerformance(test_words, root_outputs, all_outputs[1:], pred_outputs[1:],
+                                                              pickle_handler.pickle_loader('class_labels_transformed'))
+            _ = evaluator.p_r_curve_plotter()
         elif MODE == 'predict':
             test_data_dir = paths['hindi_test']
             sentences = extract_word_root_and_feature.get_words_for_predictions(test_data_dir)

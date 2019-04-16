@@ -84,9 +84,7 @@ class MorphAnalyzerModels():
         dot_product_2 = dot([attention, encoder], axes=[2,1], name='dot2')
         decoder_context_combined = concatenate([dot_product_2, decoder], name='concatenate')
         outputs = TimeDistributed(Dense(int(self.hidden_dim/2), activation='tanh'), name='time_dist_1')(decoder_context_combined)
-        print(outputs.shape)
         output_final = TimeDistributed(Dense(self.vocab_size, activation='softmax'), name='time_dist_2')(outputs)
-        print(output_final.shape)
         ################## End of seq2seq model ###########################
         output_layers = [output_final]
         output_layers += feature_outputs
