@@ -1,5 +1,13 @@
 # Hindi Morph Analyzer  [![made-with-python](https://img.shields.io/badge/Made%20with-Python-1f425f.svg)](https://www.python.org/)
 
+A multi-task learning CNN-RNN model combined together with the potential of task-optimized phonetic features to predict the Lemma, POS category, Gender, Number, Person, Case, and Tense-aspect-mood (TAM) of Hindi words. 
+
+![image](https://github.com/Saurav0074/morph_analyzer/blob/master/output/sample.png)
+
+## Framework
+
+![image2](https://github.com/Saurav0074/morph_analyzer/blob/master/output/morph_analyzer_model.png)
+
 # Getting started
 
 ### Clone the repository
