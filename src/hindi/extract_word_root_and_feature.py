@@ -15,7 +15,7 @@ class ParseFile():
     def read_file(filepath):
         with open(filepath, 'r', encoding='utf-8') as f:
             lines = f.readlines()
-        return lines[:100]
+        return lines[:40]
 
 
     def get_content_from_all_lines(self, lines):

@@ -10,7 +10,7 @@ from keras.constraints import maxnorm
 
 class MorphAnalyzerModels():
     def __init__(self, max_word_len, vocab_len, embedding_dim,
-                 list_of_feature_nums, cw, use_phonetic_features=False):
+                 list_of_feature_nums, cw, use_phonetic_features=False, phonetic_dims=None):
         self.max_len = max_word_len
         self.vocab_size = vocab_len
         self.embed_dim = embedding_dim
@@ -21,9 +21,11 @@ class MorphAnalyzerModels():
         self.rnn_output_size = 32
         self.dropout_rate = 0.3
         self.num_strides = 1
-        self.phonetic_flag = use_phonetic_features
         self.list_of_feature_classes = list_of_feature_nums
         self.window = cw
+        self.use_phonetic_flag = use_phonetic_features
+        if self.use_phonetic_flag:
+            self.phonetic_dims = phonetic_dims
 
     def apply_conv_and_pooling(self, inputs, kernel_size):
         convolutions = [Conv1D(filters=self.num_filters, kernel_size=kernel_size, padding='same', activation='relu',
@@ -46,10 +48,19 @@ class MorphAnalyzerModels():
     def define_input_layers(self):
         input_layers = [Input(shape=(self.max_len,), dtype='float32', name='input' + str(idx)) for idx in
                         range(2*self.window + 2)] # 2 = 1(current word) + 1(decoder_input)
+        if self.use_phonetic_flag is True:
+            phonetic_inputs = [Input(shape=(num,), dtype='float32', name='phonetic_' + str(idx)) for idx, num in
+                               enumerate(self.phonetic_dims)]
+            input_layers.extend(phonetic_inputs)
         return input_layers
 
     def cnn_rnn(self):
         input_layers = self.define_input_layers()
+
+        if self.use_phonetic_flag is True:
+            phonetic_inputs = input_layers[-len(self.phonetic_dims):]
+            input_layers = input_layers[:len(input_layers) - len(self.phonetic_dims)]
+
         embedding_layers = self.apply_embedding(input_layers, mask_flag=False, _name='common')
         dropouts_1 = [Dropout(self.dropout_rate, name='drop'+str(idx))(embeddings) for idx, embeddings in
                       enumerate(embedding_layers)]
@@ -58,18 +69,27 @@ class MorphAnalyzerModels():
         convolution_5 = self.apply_conv_and_pooling(inputs=noises, kernel_size=5)
         merge_convolutions = merge(convolution_4+convolution_5, mode='concat', name='main_merge')
         dropouts_2 = Dropout(self.dropout_rate, name='drop_1')(merge_convolutions)
-        last_layer = Bidirectional(self.rnn(self.rnn_output_size), name='gru_1')(dropouts_2)
-        if self.phonetic_flag is True:
-            # all_features = merge([last_layer, phonetic_input], mode='concat', name='phonetic_merge')
-            # dense_phonetic =  Dense(self.hidden_dim, activation='relu', kernel_initializer='he_normal', kernel_constraint=maxnorm(3),
-            #             bias_constraint=maxnorm(3), name='dense_phonetic')(all_features)
-            # last_layer = Dropout(self.dropout_rate, name='dropout_phonetic')(dense_phonetic)
-            pass
-        dense_1 = Dense(self.hidden_dim, activation='relu', kernel_initializer='he_normal', kernel_constraint=maxnorm(3),
-                        bias_constraint=maxnorm(3), name='dense1')(last_layer)
-        dropouts_3 = Dropout(self.dropout_rate, name='drop_2')(dense_1)
-        feature_outputs = [Dense(n, kernel_initializer='he_normal', activation='softmax', name='output'+str(idx))(dropouts_3)
-                            for idx, n in enumerate(self.list_of_feature_classes)]
+        last_layers = [Bidirectional(self.rnn(self.rnn_output_size), name='gru_1')(dropouts_2)]
+
+        if self.use_phonetic_flag is True:
+            all_features = [merge([last_layer, phonetic_input], mode='concat', name='phonetic_merge_'+str(idx))
+                            for idx, phonetic_input in enumerate(phonetic_inputs) for last_layer in last_layers]
+            dense_phonetics =  [Dense(self.hidden_dim, activation='relu', kernel_initializer='he_normal', kernel_constraint=maxnorm(3),
+                        bias_constraint=maxnorm(3), name='dense_phonetic_'+str(idx))(feature) for idx, feature in enumerate(all_features)]
+            last_layers = [Dropout(self.dropout_rate, name='dropout_phonetic_'+str(idx))(dense_phonetic)
+                           for idx, dense_phonetic in enumerate(dense_phonetics)]
+
+        dense_1s = [Dense(self.hidden_dim, activation='relu', kernel_initializer='he_normal', kernel_constraint=maxnorm(3),
+                        bias_constraint=maxnorm(3), name='dense1_'+str(idx))(last_layer) for idx, last_layer in
+                        enumerate(last_layers)]
+        dropouts_3 = [Dropout(self.dropout_rate, name='drop_2_' + str(idx))(dense) for idx, dense in enumerate(dense_1s)]
+        if len(dropouts_3) == len(self.list_of_feature_classes):
+            print(len(dropouts_3), len(self.list_of_feature_classes))
+            feature_outputs = [Dense(n, kernel_initializer='he_normal', activation='softmax', name='output'+str(idx))(dropout)
+                                for idx, (n, dropout) in enumerate(zip(self.list_of_feature_classes, dropouts_3))]
+        else:
+            feature_outputs = [Dense(n, kernel_initializer='he_normal', activation='softmax', name='output'+str(idx))(dropouts_3[0])
+                               for idx, n in enumerate(self.list_of_feature_classes)]
         ################## seq2seq model for root prediction: Luong et. al. (2015) #####################
         encoder_embedding = self.apply_embedding([input_layers[0]], mask_flag=True, _name='encoder')[0] # only on current word now
         encoder, state = self.rnn(self.rnn_output_size, return_sequences=True, unroll=True, return_state=True,

@@ -1,4 +1,4 @@
-from argparse import ArgumentParser
+import argparse
 from collections import Counter
 from copy import deepcopy
 
@@ -9,19 +9,27 @@ from keras.preprocessing.sequence import pad_sequences
 from keras.utils import np_utils
 from sklearn.preprocessing import LabelEncoder
 
-from src import handle_pickles, process_words
-from src.hindi import extract_word_root_and_feature
-from src.models import cnn_rnn_with_context
-from src.eval import evaluate_and_plot
+from src import handle_pickles, process_words, extract_phonetic_features
+from src import extract_word_root_and_feature, cnn_rnn_with_context, evaluate_and_plot
 
-parser = ArgumentParser(description="Enter --lang = 'hindi' for Hindi and 'urdu' for Urdu; "
+def str2bool(v):
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
+parser = argparse.ArgumentParser(description="Enter --lang = 'hindi' for Hindi and 'urdu' for Urdu; "
                                     "--mode = 'train, test, or predict'")
 parser.add_argument("--lang", required=True)
 parser.add_argument("--mode", required=True, default='test')
+parser.add_argument("--phonetic", type=str2bool, nargs='?')
+
 args = vars(parser.parse_args())
 pickle_handler= handle_pickles.PickleHandler()
 
-LANG, MODE, = args['lang'], args['mode']
+LANG, MODE, PHONETIC_FLAG = args['lang'], args['mode'], args['phonetic']
 CONFIG_PATH = 'config/'
 
 VOCAB_SIZE = 89
@@ -113,10 +121,11 @@ def pad_all_sequences(indexed_outputs):
     return all_padded_inputs, max_word_len
 
 
-def _create_model(max_word_len, embed_dim, n):
+def _create_model(max_word_len, embed_dim, n, phonetic_feature_nums):
     model_instance = cnn_rnn_with_context.MorphAnalyzerModels(max_word_len=max_word_len, vocab_len=VOCAB_SIZE+2,
                                                               embedding_dim=embed_dim, list_of_feature_nums=n,
-                                                              cw=CONTEXT_WINDOW)
+                                                              cw=CONTEXT_WINDOW, use_phonetic_features=PHONETIC_FLAG,
+                                                              phonetic_dims=phonetic_feature_nums)
     compiled_model = model_instance.create_and_compile_model()
     return compiled_model
 
@@ -134,13 +143,19 @@ def get_decoder_input(x_train):
     return x_decoder_input
 
 
-def segregate_inputs_and_outputs(words_and_roots, features, decoder_inputs):
+def segregate_inputs_and_outputs(words_and_roots, features, decoder_inputs, phonetic_features=None):
     roots = words_and_roots[-1]
     inputs = words_and_roots[:-1]
     inputs.append(decoder_inputs)
+    num_of_optimized_features = list()
+
+    if PHONETIC_FLAG is True:
+        inputs.extend(phonetic_features)
+        num_of_optimized_features = [len(each) for each in phonetic_features[0]]
     outputs = [roots]
     outputs += features
-    return inputs, outputs
+
+    return inputs, outputs, num_of_optimized_features
 
 
 def write_features_to_file(words, orig_features, pred_features, output_path):
@@ -232,6 +247,12 @@ class ProcessDataForModel():
         self.roots = roots
         self.features = features
 
+    def phonetic_features_extractor(self):
+        extractor = extract_phonetic_features.PhoneticFeatures(self.words)
+        features = extractor.get_features()
+        features = [word_feature[:FEATURE_NUMS] for word_feature in features]
+        return features
+
     def process_end_to_end(self):
         data_processor = ProcessAndTokenizeData(n_features=FEATURE_NUMS, words=self.words,
                                                 roots=self.roots,
@@ -239,14 +260,19 @@ class ProcessDataForModel():
         categorized_features, n = data_processor.process_features()
         indexed_inputs = data_processor.process_words_and_roots(CONTEXT_WINDOW)
         padded_indexed_inputs, max_word_len = pad_all_sequences(indexed_inputs)
-        # print([type(each) for each in padded_indexed_inputs]);
         padded_indexed_inputs[-1] = process_words.one_hot_encode_output_data(
             padded_indexed_inputs[-1], max_word_len, VOCAB_SIZE+2
         )
         decoder_input = get_decoder_input(padded_indexed_inputs[0])
-        all_inputs, all_outputs = segregate_inputs_and_outputs(padded_indexed_inputs, categorized_features,
-                                                               decoder_inputs=decoder_input)
-        return [all_inputs, all_outputs, max_word_len, n]
+        phonetic_features = list()
+        if PHONETIC_FLAG is True:
+            phonetic_features = self.phonetic_features_extractor()
+        all_inputs, all_outputs, num_of_optimized_features = segregate_inputs_and_outputs(padded_indexed_inputs,
+                                                                                          categorized_features,
+                                                                                          decoder_inputs=decoder_input,
+                                                                                          phonetic_features=phonetic_features)
+
+        return [all_inputs, all_outputs, max_word_len, n, num_of_optimized_features]
 
 
 
@@ -271,9 +297,10 @@ def main():
             train_val_features = [i+j for i,j in zip(train_features, val_features)]
             train_data_generator = ProcessDataForModel(words=train_val_words, roots=train_val_roots,
                                                        features=train_val_features)
-            all_inputs, all_outputs, max_word_len, n = train_data_generator.process_end_to_end()
+
+            all_inputs, all_outputs, max_word_len, n, phonetic_feature_num = train_data_generator.process_end_to_end()
             params = read_path_configs('model_params.yaml')
-            model = _create_model(max_word_len, params['EMBED_DIM'], n)
+            model = _create_model(max_word_len, params['EMBED_DIM'], n, phonetic_feature_num)
             train_inputs, val_inputs = split_train_val(all_inputs, train_size)
             train_outputs, val_outputs = split_train_val(all_outputs, train_size)
             hist = model.fit(train_inputs, train_outputs, validation_data=(val_inputs, val_outputs),
