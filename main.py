@@ -4,6 +4,7 @@ from copy import deepcopy
 
 import numpy as np
 import yaml
+import shap
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.preprocessing.sequence import pad_sequences
 from keras.utils import np_utils
@@ -190,6 +191,8 @@ def write_roots_to_file(words, orig_roots, pred_roots, output_path):
         f.close()
     return orig_roots, pred_sequences
 
+def get_model_path(paths):
+    return paths['model_weights'] if PHONETIC_FLAG is True else paths['model_weights_phonetic']
 
 def write_predicted_roots_and_features(sentences, predictions, output_path):
     encoders = pickle_handler.pickle_loader('dict_of_encoders')
@@ -300,18 +303,19 @@ def main():
                                                        features=train_val_features)
 
             all_inputs, all_outputs, max_word_len, n, phonetic_feature_num = train_data_generator.process_end_to_end()
-            print("allinputs: ", len(all_inputs), type(all_inputs))
             params = read_path_configs('model_params.yaml')
             model = _create_model(max_word_len, params['EMBED_DIM'], n, phonetic_feature_num)
-            print("================= Reached here ! =============")
+
             train_inputs, val_inputs = split_train_val(all_inputs, train_size)
             train_outputs, val_outputs = split_train_val(all_outputs, train_size)
             hist = model.fit(train_inputs, train_outputs, validation_data=(val_inputs, val_outputs),
                              batch_size = params['BATCH_SIZE'], epochs=params['EPOCHS'],
                              callbacks=[EarlyStopping(patience=10),
-                                        ModelCheckpoint(paths['model_weights'], save_best_only=True,
+                                        ModelCheckpoint(filepath= get_model_path(paths=paths),
+                                                        save_best_only=True,
                                                         verbose=1, save_weights_only=True)
                                         ])
+
         elif MODE == 'test':
             test_data_dir = paths['hdtb']['test']
             contents = extract_word_root_and_feature.get_words_roots_and_features(
@@ -321,11 +325,13 @@ def main():
             test_words, test_roots, test_features = index_identifier.remove_unknown_feature_labels()
             test_data_generator = ProcessDataForModel(words=test_words, roots=test_roots,
                                                        features=test_features)
-            all_inputs, all_outputs, max_word_len, n = test_data_generator.process_end_to_end()
+
+            all_inputs, all_outputs, max_word_len, n, phonetic_feature_num = test_data_generator.process_end_to_end()
             params = read_path_configs('model_params.yaml')
-            model = _create_model(max_word_len, params['EMBED_DIM'], n)
-            model.load_weights(paths['model_weights'])
+            model = _create_model(max_word_len, params['EMBED_DIM'], n, phonetic_feature_num)
+            model.load_weights(get_model_path(paths=paths))
             pred_outputs = model.predict(all_inputs)
+
             predicted_char_indices = np.argmax(pred_outputs[0], axis=2)
             predicted_features = [np.argmax(each, axis=1) for each in pred_outputs[1:]]
             _ = write_features_to_file(test_words, all_outputs[1:], predicted_features, paths['output'])
@@ -333,6 +339,7 @@ def main():
             evaluator = evaluate_and_plot.EvaluatePerformance(test_words, root_outputs, all_outputs[1:], pred_outputs[1:],
                                                               pickle_handler.pickle_loader('class_labels_transformed'))
             _ = evaluator.p_r_curve_plotter()
+
         elif MODE == 'predict':
             test_data_dir = paths['hindi_test']
             sentences = extract_word_root_and_feature.get_words_for_predictions(test_data_dir)
@@ -347,13 +354,26 @@ def main():
                 all_inputs += X_indexed_left
                 all_inputs += X_indexed_right
                 padded_indexed_inputs, max_word_len = pad_all_sequences(all_inputs)
+
                 n = pickle_handler.pickle_loader('num_of_indiv_features')
                 decoder_input = get_decoder_input(padded_indexed_inputs[0])
                 padded_indexed_inputs.append(decoder_input)
+
+                num_of_optimized_features = list()
+                if PHONETIC_FLAG is True:
+                    extractor = extract_phonetic_features.PhoneticFeatures(sentence)
+                    features = extractor.get_features()
+                    features = [word_feature[:FEATURE_NUMS] for word_feature in features]
+                    tag_grouped_phonetic_features = [list(zip(*features))[idx] for idx in
+                                                     range(len(features[0]))]
+                    _ = [padded_indexed_inputs.append(np.array(each)) for each in tag_grouped_phonetic_features]
+                    num_of_optimized_features = [len(each) for each in features[0]]
+
                 params = read_path_configs('model_params.yaml')
-                model = _create_model(max_word_len, params['EMBED_DIM'], n)
-                model.load_weights(paths['model_weights'])
+                model = _create_model(max_word_len, params['EMBED_DIM'], n, num_of_optimized_features)
+                model.load_weights(get_model_path(paths=paths))
                 pred_outputs = model.predict(padded_indexed_inputs)
+
                 predicted_char_indices = np.argmax(pred_outputs[0], axis=2)
                 predicted_features = [np.argmax(each, axis=1) for each in pred_outputs[1:]]
                 predictions = list()
