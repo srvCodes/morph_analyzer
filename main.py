@@ -150,7 +150,8 @@ def segregate_inputs_and_outputs(words_and_roots, features, decoder_inputs, phon
     num_of_optimized_features = list()
 
     if PHONETIC_FLAG is True:
-        inputs.extend(phonetic_features)
+        tag_grouped_phonetic_features = [list(zip(*phonetic_features))[idx] for idx in range(len(phonetic_features[0]))]
+        _ = [inputs.append(each) for each in tag_grouped_phonetic_features]
         num_of_optimized_features = [len(each) for each in phonetic_features[0]]
     outputs = [roots]
     outputs += features
@@ -299,8 +300,10 @@ def main():
                                                        features=train_val_features)
 
             all_inputs, all_outputs, max_word_len, n, phonetic_feature_num = train_data_generator.process_end_to_end()
+            print("allinputs: ", len(all_inputs), type(all_inputs))
             params = read_path_configs('model_params.yaml')
             model = _create_model(max_word_len, params['EMBED_DIM'], n, phonetic_feature_num)
+            print("================= Reached here ! =============")
             train_inputs, val_inputs = split_train_val(all_inputs, train_size)
             train_outputs, val_outputs = split_train_val(all_outputs, train_size)
             hist = model.fit(train_inputs, train_outputs, validation_data=(val_inputs, val_outputs),
