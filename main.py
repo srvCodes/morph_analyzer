@@ -151,11 +151,11 @@ def segregate_inputs_and_outputs(words_and_roots, features, decoder_inputs, phon
 
     if PHONETIC_FLAG is True:
         tag_grouped_phonetic_features = [list(zip(*phonetic_features))[idx] for idx in range(len(phonetic_features[0]))]
-        _ = [inputs.append(each) for each in tag_grouped_phonetic_features]
+        _ = [inputs.append(np.array(each)) for each in tag_grouped_phonetic_features]
         num_of_optimized_features = [len(each) for each in phonetic_features[0]]
+
     outputs = [roots]
     outputs += features
-
     return inputs, outputs, num_of_optimized_features
 
 
