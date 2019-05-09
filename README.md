@@ -48,7 +48,7 @@ For the predict mode, all the predictions (i.e., roots + features) get written t
 
 ### Graph outputs for multi-objective optimization of phonological features
 
-- Cubic-spline interpolations depicting validation accuracies in population:
+- Cubic-spline interpolations depicting validation accuracies ordered by population:
 
 ![moo](https://github.com/Saurav0074/morph_analyzer/blob/master/src/images/cubic-splines.png)
 
