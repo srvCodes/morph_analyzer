@@ -1,4 +1,4 @@
-# Hindi Morph Analyzer  [![made-with-python](https://img.shields.io/badge/Made%20with-Python-1f425f.svg)](https://www.python.org/)
+# Multi-Task Deep Morph Analyzer  [![made-with-python](https://img.shields.io/badge/Made%20with-Python-1f425f.svg)](https://www.python.org/)
 
 A multi-task learning CNN-RNN model combined together with the potential of task-optimized phonetic features to predict the Lemma, POS category, Gender, Number, Person, Case, and Tense-aspect-mood (TAM) of Hindi words. 
 
@@ -52,7 +52,7 @@ For the predict mode, all the predictions (i.e., roots + features) get written t
 
 ![moo](https://github.com/Saurav0074/morph_analyzer/blob/master/src/images/cubic-splines.png)
 
-Note: A complete yet messy codebase can be found [here](https://github.com/Saurav0074/mt-dma).
+Note: A complete yet messy codebase covering Urdu can be found [here](https://github.com/Saurav0074/mt-dma).
 
 # Citation
 
