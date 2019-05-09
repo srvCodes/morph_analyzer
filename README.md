@@ -39,7 +39,10 @@ For prediction, the test sentences should be provided within `src/hindi/test_dat
 
 ### Outputs
 
-For the test mode, the gold and predicted roots as well as features are all written to separate files within `output/roots.txt, feature_0.txt, ..., feature_6.txt`.
+For the test mode:
+
+- the gold and predicted roots as well as features are all written to separate files within `output/roots.txt, feature_0.txt, ..., feature_6.txt`.
+- Micro-averaged precision-recall graphs are stored in `graph_outputs`.
 
 For the predict mode, all the predictions (i.e., roots + features) get written to the same file - `output/predictions.txt`.
 
