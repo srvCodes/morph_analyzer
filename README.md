@@ -27,9 +27,6 @@ The file `main.py` takes the following command-line arguments:
 | mode     | train, test and predict (no gold labels required) | Training, testing and predictions |
 | phonetic | True/1/yes/y/t and False/0/no/n/0 | Use MOO-driven phonological features or not |
 
-```
---lang with possible values `hindi` and `urdu`, (b) --mode with values `train` for training, `test` for testing and evaluating, and `predict` for prediction, and (c) --phonetic with values `1/True. 
-```
 `train` and `test` modes operate upon the standard train-test split specified by the HDTB and UDTB datasets (see `datasets` README) while `predict` uses the text provided manually in `src/hindi/test_data.txt`.
 
 Sample run command: 
