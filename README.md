@@ -2,11 +2,11 @@
 
 A multi-task learning CNN-RNN model combined together with the potential of task-optimized phonetic features to predict the Lemma, POS category, Gender, Number, Person, Case, and Tense-aspect-mood (TAM) of Hindi words. 
 
-![image](https://github.com/Saurav0074/morph_analyzer/blob/master/output/sample.png)
+![image](https://github.com/Saurav0074/morph_analyzer/blob/master/src/images/sample.png)
 
 ## Framework
 
-![image2](https://github.com/Saurav0074/morph_analyzer/blob/master/output/morph_analyzer_model.png)
+![image2](https://github.com/Saurav0074/morph_analyzer/blob/master/src/images/morph_analyzer_model.png)
 
 # Getting started
 
@@ -43,6 +43,13 @@ For the test mode, the gold and predicted roots as well as features are all writ
 
 For the predict mode, all the predictions (i.e., roots + features) get written to the same file - `output/predictions.txt`.
 
+### Graph outputs for multi-objective optimization of phonological features
+
+- Cubic-spline interpolations depicting validation accuracies in population:
+
+![moo](https://github.com/Saurav0074/morph_analyzer/blob/master/src/images/cubic-splines.png)
+
+Note: A complete yet messy codebase can be found [here](https://github.com/Saurav0074/mt-dma).
 
 # Citation
 
