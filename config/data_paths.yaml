@@ -4,6 +4,8 @@ hdtb:
   train:  "../HDTB_pre_release_version-0.05/IntraChunk/CoNLL/utf/news_articles_and_heritage/Training/"
   validation: "../HDTB_pre_release_version-0.05/IntraChunk/CoNLL/utf/news_articles_and_heritage/Development/"
 output: 'output/'
-model_weights: 'src/model_weights/model1.hdf5'
-model_weights_phonetic: 'src/model_weights/model1_with_phonetic.hdf5'
+model_weights_basic: 'src/model_weights/model.hdf5'
+model_weights_phonetic: 'src/model_weights/model_with_phonetic.hdf5'
+model_weights_basic_frozen: 'src/model_weights/model_frozen.hdf5'
+model_weights_phonetic_frozen: 'src/model_weights/model_with_phonetic_frozen.hdf5'
 hindi_test: 'src/hindi/test_data.txt'

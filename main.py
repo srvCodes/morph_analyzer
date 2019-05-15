@@ -26,11 +26,15 @@ parser = argparse.ArgumentParser(description="Enter --lang = 'hindi' for Hindi a
 parser.add_argument("--lang", required=True)
 parser.add_argument("--mode", required=True, default='test')
 parser.add_argument("--phonetic", type=str2bool, nargs='?')
+parser.add_argument('--freezing', type=str2bool, nargs='?')
 
 args = vars(parser.parse_args())
 pickle_handler= handle_pickles.PickleHandler()
 
-LANG, MODE, PHONETIC_FLAG = args['lang'], args['mode'], args['phonetic']
+LANG, MODE = args['lang'], args['mode']
+PHONETIC_FLAG = args['phonetic'] if args['phonetic'] is not None else False
+FREEZER_FLAG = args['freezing'] if args['freezing'] is not None else True
+
 CONFIG_PATH = 'config/'
 
 VOCAB_SIZE = 89
@@ -122,12 +126,12 @@ def pad_all_sequences(indexed_outputs):
     return all_padded_inputs, max_word_len
 
 
-def _create_model(max_word_len, embed_dim, n, phonetic_feature_nums):
+def _create_model(max_word_len, embed_dim, n, phonetic_feature_nums, freezing_call=False):
     model_instance = cnn_rnn_with_context.MorphAnalyzerModels(max_word_len=max_word_len, vocab_len=VOCAB_SIZE+2,
                                                               embedding_dim=embed_dim, list_of_feature_nums=n,
                                                               cw=CONTEXT_WINDOW, use_phonetic_features=PHONETIC_FLAG,
                                                               phonetic_dims=phonetic_feature_nums)
-    compiled_model = model_instance.create_and_compile_model()
+    compiled_model = model_instance.create_and_compile_model(freezer=freezing_call)
     return compiled_model
 
 
@@ -191,8 +195,6 @@ def write_roots_to_file(words, orig_roots, pred_roots, output_path):
         f.close()
     return orig_roots, pred_sequences
 
-def get_model_path(paths):
-    return paths['model_weights'] if PHONETIC_FLAG is True else paths['model_weights_phonetic']
 
 def write_predicted_roots_and_features(sentences, predictions, output_path):
     encoders = pickle_handler.pickle_loader('dict_of_encoders')
@@ -216,6 +218,42 @@ def write_predicted_roots_and_features(sentences, predictions, output_path):
                 f.write('\t\t'.join(each) + '\n')
             f.write('\n')
         f.close()
+
+def get_model_path(paths):
+    path_to_flag = {1: 'model_weights_basic', 2:'model_weights_phonetic', 3:'model_weights_basic_frozen',
+                    4: 'model_weights_phonetic_frozen'}
+    if PHONETIC_FLAG is True and FREEZER_FLAG is True:
+        key = 4
+    elif PHONETIC_FLAG is False and FREEZER_FLAG is True:
+        key = 3
+    elif PHONETIC_FLAG is True and FREEZER_FLAG is False:
+        key = 2
+    else:
+        key = 1
+    return paths[path_to_flag[key]]
+
+
+def get_frozen_layer_names():
+    layers = ['drop0', 'drop1', 'drop2', 'drop3', 'drop4', 'drop5', 'drop6', 'drop7', 'drop8', 'drop9', 'noise0',
+              'noise1', 'noise2', 'noise3', 'noise4', 'noise5', 'noise6', 'noise7', 'noise8', 'noise9', 'Conv4_0',
+              'Conv4_1', 'Conv4_2', 'Conv4_3', 'Conv4_4', 'Conv4_5', 'Conv4_6', 'Conv4_7', 'Conv4_8', 'Conv4_9',
+              'Conv5_0', 'Conv5_1', 'Conv5_2', 'Conv5_3', 'Conv5_4', 'Conv5_5', 'Conv5_6', 'Conv5_7', 'Conv5_8',
+              'Conv5_9', 'MaxPool4_0', 'AvgPool4_0', 'MaxPool4_1', 'AvgPool4_1', 'MaxPool4_2', 'AvgPool4_2', 'MaxPool4_3',
+              'AvgPool4_3', 'MaxPool4_4', 'AvgPool4_4', 'MaxPool4_5', 'AvgPool4_5', 'MaxPool4_6', 'AvgPool4_6', 'MaxPool4_7',
+              'AvgPool4_7', 'MaxPool4_8', 'AvgPool4_8', 'MaxPool4_9', 'AvgPool4_9', 'MaxPool5_0', 'AvgPool5_0', 'MaxPool5_1',
+              'AvgPool5_1', 'MaxPool5_2', 'AvgPool5_2', 'MaxPool5_3', 'AvgPool5_3', 'MaxPool5_4', 'AvgPool5_4', 'MaxPool5_5',
+              'AvgPool5_5', 'MaxPool5_6', 'AvgPool5_6', 'MaxPool5_7', 'AvgPool5_7', 'MaxPool5_8', 'AvgPool5_8', 'MaxPool5_9',
+              'AvgPool5_9', 'Merge_4_0', 'Merge_4_1', 'Merge_4_2', 'Merge_4_3', 'Merge_4_4', 'Merge_4_5', 'Merge_4_6',
+              'Merge_4_7', 'Merge_4_8', 'Merge_4_9', 'Merge_5_0', 'Merge_5_1', 'Merge_5_2', 'Merge_5_3', 'Merge_5_4',
+              'Merge_5_5', 'Merge_5_6', 'Merge_5_7', 'Merge_5_8', 'Merge_5_9', 'main_merge', 'gru_1', 'phonetic_merge_0',
+              'phonetic_merge_1', 'phonetic_merge_2', 'phonetic_merge_3', 'phonetic_merge_4', 'phonetic_merge_5',
+              'dense_phonetic_0', 'dense_phonetic_1', 'dense_phonetic_2', 'dense_phonetic_3', 'dense_phonetic_4',
+              'dense_phonetic_5', 'dot2', 'dropout_phonetic_0', 'dropout_phonetic_1', 'dropout_phonetic_2',
+              'dropout_phonetic_3', 'dropout_phonetic_4', 'dropout_phonetic_5', 'dense1_0', 'dense1_1', 'dense1_2',
+              'dense1_3', 'dense1_4', 'dense1_5', 'drop_2_0', 'drop_2_1', 'drop_2_2', 'drop_2_3', 'drop_2_4', 'drop_2_5',
+              'output0', 'output1', 'output2', 'output3', 'output4', 'output5']
+    return layers
+
 
 class RemoveErroneousIndices():
     def __init__(self, test_file_contents):
@@ -315,7 +353,25 @@ def main():
                                                         save_best_only=True,
                                                         verbose=1, save_weights_only=True)
                                         ])
-
+            if FREEZER_FLAG is True:
+                frozen_model = _create_model(max_word_len, params['EMBED_DIM'], n, phonetic_feature_num, freezing_call=True)
+                model.load_weights(get_model_path(paths=paths))
+                layers_to_be_frozen = get_frozen_layer_names()
+                for layer in model.layers:
+                    frozen_model.get_layer(layer.name).set_weights(model.get_layer(layer.name).get_weights())
+                for layer_to_be_frozen in layers_to_be_frozen:
+                    try:
+                        frozen_model.get_layer(layer_to_be_frozen).trainable = False
+                    except KeyError:
+                        pass
+                frozen_model.compile(optimizer='adadelta', loss='categorical_crossentropy', metrics=['accuracy'])
+                hist = frozen_model.fit(train_inputs, train_outputs, validation_data=(val_inputs, val_outputs),
+                                 batch_size=params['BATCH_SIZE'], epochs=params['EPOCHS'],
+                                 callbacks=[EarlyStopping(patience=10),
+                                            ModelCheckpoint(filepath=get_model_path(paths=paths),
+                                                            save_best_only=True,
+                                                            verbose=1, save_weights_only=True)
+                                            ])
         elif MODE == 'test':
             test_data_dir = paths['hdtb']['test']
             contents = extract_word_root_and_feature.get_words_roots_and_features(
