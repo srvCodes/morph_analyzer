@@ -111,7 +111,8 @@ class MorphAnalyzerModels():
         model = Model(inputs=all_input_layers, outputs=output_layers)
         return model
 
-    def create_and_compile_model(self):
+    def create_and_compile_model(self, freezer):
         model = self.cnn_rnn()
-        model.compile(optimizer=Adadelta(), loss='categorical_crossentropy', metrics=['accuracy'])
+        if freezer is False:
+            model.compile(optimizer=Adadelta(), loss='categorical_crossentropy', metrics=['accuracy'])
         return model
