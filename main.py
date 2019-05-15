@@ -4,14 +4,14 @@ from copy import deepcopy
 
 import numpy as np
 import yaml
-import shap
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.preprocessing.sequence import pad_sequences
 from keras.utils import np_utils
 from sklearn.preprocessing import LabelEncoder
 
-from src import handle_pickles, process_words, extract_phonetic_features
 from src import extract_word_root_and_feature, cnn_rnn_with_context, evaluate_and_plot
+from src import handle_pickles, process_words, extract_phonetic_features
+
 
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
@@ -33,7 +33,7 @@ pickle_handler= handle_pickles.PickleHandler()
 
 LANG, MODE = args['lang'], args['mode']
 PHONETIC_FLAG = args['phonetic'] if args['phonetic'] is not None else False
-FREEZER_FLAG = args['freezing'] if args['freezing'] is not None else True
+FREEZER_FLAG = args['freezing'] if args['freezing'] is not None else False
 
 CONFIG_PATH = 'config/'
 
