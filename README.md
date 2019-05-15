@@ -33,7 +33,7 @@ The file `main.py` takes the following command-line arguments:
 #### Sample run command: 
 
 ```python
->>> python main.py --lang hindi --mode train --phonetic 1 --freezing True
+>>> python main.py --lang hindi --mode train --phonetic t --freezing t
 ```
 
 For prediction, the test sentences should be provided within `src/hindi/test_data.txt`.
