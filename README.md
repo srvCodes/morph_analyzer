@@ -53,7 +53,7 @@ For the predict mode, all the predictions (i.e., roots + features) are written t
 
 ![moo](https://github.com/Saurav0074/morph_analyzer/blob/master/src/images/cubic-splines.png)
 
-Note: A complete yet messy codebase covering Urdu can be found [here](https://github.com/Saurav0074/mt-dma).
+Note: A complete yet unorganized codebase covering Urdu can be found [here](https://github.com/Saurav0074/mt-dma).
 
 # Citation
 
