@@ -1,0 +1,5 @@
+Word		Root		POS		Gender		Number		Person		Case		TAM
+!بَراًےمہربانی		سییررراایی		n		m		sg		3		d		0
+کچھدیر		کرررررررررررررر		n		m		sg		3		d		0
+دیرانتظارکیجیًے		اارررراجا		n		m		pl		3		o		0
+

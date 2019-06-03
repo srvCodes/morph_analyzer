@@ -1,11 +1,17 @@
-udtb: "../UDTB_pre_release_version-0.01/"
-hdtb:
+urdu:
+  test: "../UDTB_pre_release_version-0.01/Intra-chunk/CONLL/utf/Testing/"
+  train: "../UDTB_pre_release_version-0.01/Intra-chunk/CONLL/utf/Training/"
+  validation: "../UDTB_pre_release_version-0.01/Intra-chunk/CONLL/utf/Development/"
+hindi:
   test: "../HDTB_pre_release_version-0.05/IntraChunk/CoNLL/utf/news_articles_and_heritage/Testing/"
   train:  "../HDTB_pre_release_version-0.05/IntraChunk/CoNLL/utf/news_articles_and_heritage/Training/"
   validation: "../HDTB_pre_release_version-0.05/IntraChunk/CoNLL/utf/news_articles_and_heritage/Development/"
-output: 'output/'
-model_weights_basic: 'src/model_weights/model.hdf5'
-model_weights_phonetic: 'src/model_weights/model_with_phonetic.hdf5'
-model_weights_basic_frozen: 'src/model_weights/model_frozen.hdf5'
-model_weights_phonetic_frozen: 'src/model_weights/model_with_phonetic_frozen.hdf5'
-hindi_test: 'src/hindi/test_data.txt'
+output_hindi: 'output/hindi/'
+output_urdu: 'output/urdu/'
+model_weights:
+  1: 'src/model_weights/model'
+  2: 'src/model_weights/model_with_phonetic'
+  3: 'src/model_weights/model_frozen'
+  4: 'src/model_weights/model_with_phonetic_frozen'
+hindi_predict_input: 'src/hindi_predict_data/test_data.txt'
+urdu_predict_input: 'src/urdu_predict_data/test_data.txt'

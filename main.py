@@ -78,7 +78,7 @@ class ProcessAndTokenizeData():
                                                                                                  flag='transformed')
             categorical_features = [np_utils.to_categorical(feature, num_classes=n) for feature, n in
                                     zip(encoded_features, num_of_indiv_feature_tags)]
-            _ = [pickle_handler.pickle_dumper(obj, name) for obj, name in zip([dict_of_encoders,
+            _ = [pickle_handler.pickle_dumper(obj, name+'_'+LANG) for obj, name in zip([dict_of_encoders,
                                                                                num_of_indiv_feature_tags,
                                                                                categorical_features,
                                                                                class_labels_orig,
@@ -88,7 +88,7 @@ class ProcessAndTokenizeData():
                                                        'class_labels_transformed'])]
             return categorical_features, num_of_indiv_feature_tags
         elif MODE == 'test':
-            dict_of_encoders, num_of_indiv_feature_tags = [pickle_handler.pickle_loader(name) for name in
+            dict_of_encoders, num_of_indiv_feature_tags = [pickle_handler.pickle_loader(name+'_'+LANG) for name in
                                                            ["dict_of_encoders", "num_of_indiv_features"]]
             encoded_features_test = [dict_of_encoders[i].transform(self.all_segregated_features[i]) \
                                 for i in range(self.n_features)]
@@ -101,11 +101,11 @@ class ProcessAndTokenizeData():
         X = [item[::-1] for item in self.all_words]
         y = deepcopy(self.all_roots)
         if MODE == 'train':
-            X_indexed = process_words.get_indexed_words(X, mode='build_vocab', vocab_size=VOCAB_SIZE)
+            X_indexed = process_words.get_indexed_words(X, mode='build_vocab', vocab_size=VOCAB_SIZE, lang=LANG)
         else:
-            X_indexed = process_words.get_indexed_words(X, mode='use_vocab', vocab_size=VOCAB_SIZE)
-        y_indexed = process_words.get_indexed_words(y, mode='use_vocab', vocab_size=VOCAB_SIZE)
-        input_shifter = process_words.ShiftWordsPerCW(X=X, cw=context_window, vocab_size=VOCAB_SIZE)
+            X_indexed = process_words.get_indexed_words(X, mode='use_vocab', vocab_size=VOCAB_SIZE, lang=LANG)
+        y_indexed = process_words.get_indexed_words(y, mode='use_vocab', vocab_size=VOCAB_SIZE, lang=LANG)
+        input_shifter = process_words.ShiftWordsPerCW(X=X, cw=context_window, vocab_size=VOCAB_SIZE, lang=LANG)
         X_indexed_left, X_indexed_right = input_shifter.shift_input()
         all_inputs = list()
         all_inputs.append(X_indexed)
@@ -165,7 +165,7 @@ def segregate_inputs_and_outputs(words_and_roots, features, decoder_inputs, phon
 
 
 def write_features_to_file(words, orig_features, pred_features, output_path):
-    encoders = pickle_handler.pickle_loader('dict_of_encoders')
+    encoders = pickle_handler.pickle_loader('dict_of_encoders'+'_'+LANG)
     orig_features = [[np.where(idx==1)[0][0] for idx in each] for each in orig_features]
     pred_features = [each.tolist() for each in pred_features]
     orig_transformed_features = [encoders[i].inverse_transform(orig_features[i]) for i in range(FEATURE_NUMS)]
@@ -180,7 +180,7 @@ def write_features_to_file(words, orig_features, pred_features, output_path):
 
 
 def write_roots_to_file(words, orig_roots, pred_roots, output_path):
-    idx_to_char_mapping = pickle_handler.pickle_loader('index_to_char_mapping')
+    idx_to_char_mapping = pickle_handler.pickle_loader('index_to_char_mapping'+'_'+LANG)
     pred_sequences = list()
     for each in pred_roots:
         list_of_chars = list()
@@ -197,8 +197,8 @@ def write_roots_to_file(words, orig_roots, pred_roots, output_path):
 
 
 def write_predicted_roots_and_features(sentences, predictions, output_path):
-    encoders = pickle_handler.pickle_loader('dict_of_encoders')
-    idx_to_char_mapping = pickle_handler.pickle_loader('index_to_char_mapping')
+    encoders = pickle_handler.pickle_loader('dict_of_encoders'+'_'+LANG)
+    idx_to_char_mapping = pickle_handler.pickle_loader('index_to_char_mapping'+'_'+LANG)
     with open(output_path + 'predictions.txt', 'w', encoding='utf-8') as f:
         f.write("Word\t\tRoot\t\tPOS\t\tGender\t\tNumber\t\tPerson\t\tCase\t\tTAM\n")
         for sentence, prediction in zip(sentences, predictions):
@@ -220,8 +220,6 @@ def write_predicted_roots_and_features(sentences, predictions, output_path):
         f.close()
 
 def get_model_path(paths):
-    path_to_flag = {1: 'model_weights_basic', 2:'model_weights_phonetic', 3:'model_weights_basic_frozen',
-                    4: 'model_weights_phonetic_frozen'}
     if PHONETIC_FLAG is True and FREEZER_FLAG is True:
         key = 4
     elif PHONETIC_FLAG is False and FREEZER_FLAG is True:
@@ -230,7 +228,7 @@ def get_model_path(paths):
         key = 2
     else:
         key = 1
-    return paths[path_to_flag[key]]
+    return paths['model_weights'][key]+'_'+LANG+'.hdf5'
 
 
 def get_frozen_layer_names():
@@ -258,7 +256,7 @@ def get_frozen_layer_names():
 class RemoveErroneousIndices():
     def __init__(self, test_file_contents):
         self.contents = test_file_contents
-        self.class_labels = pickle_handler.pickle_loader('class_labels_orig')
+        self.class_labels = pickle_handler.pickle_loader('class_labels_orig_'+LANG)
         self.erroneous_indices = self.get_erroneous_indices()
 
     def filter_erroneous_indices(self, _list):
@@ -316,128 +314,127 @@ class ProcessDataForModel():
 
         return [all_inputs, all_outputs, max_word_len, n, num_of_optimized_features]
 
-
-
 def main():
     paths = read_path_configs('data_paths.yaml')
-    if LANG == 'hindi':
-        if MODE == 'train':
-            train_data_dir = paths['hdtb']['train']
-            train_words, train_roots, train_features = \
-                extract_word_root_and_feature.get_words_roots_and_features(train_data_dir, n_features=FEATURE_NUMS)
-            val_data_dir = paths['hdtb']['validation']
-            val_words, val_roots, val_features = \
-                extract_word_root_and_feature.get_words_roots_and_features(val_data_dir, n_features=FEATURE_NUMS)
-            assert len(train_words) == len(train_roots) == len(train_features[1]), \
-                "Length mismatch while flattening train features"
-            assert len(val_words) == len(val_roots) == len(val_features[1]),\
-                "Length mismatch while flattening val features"
-            # print(len(train_words), len(train_roots), len(train_features[0]))
-            # print("words: {}, roots: {}, features: {}".format(train_words[:5], train_roots[:5], train_features[:5]))
-            train_size, val_size = [len(each) for each in [train_words, val_words]]
-            train_val_words, train_val_roots = [train_words + val_words, train_roots + val_roots]
-            train_val_features = [i+j for i,j in zip(train_features, val_features)]
-            train_data_generator = ProcessDataForModel(words=train_val_words, roots=train_val_roots,
-                                                       features=train_val_features)
+    if MODE == 'train':
+        train_data_dir = paths[LANG][MODE]
+        train_words, train_roots, train_features = \
+            extract_word_root_and_feature.get_words_roots_and_features(train_data_dir, n_features=FEATURE_NUMS, lang=LANG)
+        val_data_dir = paths[LANG]['validation']
+        val_words, val_roots, val_features = \
+            extract_word_root_and_feature.get_words_roots_and_features(val_data_dir, n_features=FEATURE_NUMS, lang=LANG)
+        assert len(train_words) == len(train_roots) == len(train_features[1]), \
+            "Length mismatch while flattening train features"
+        assert len(val_words) == len(val_roots) == len(val_features[1]),\
+            "Length mismatch while flattening val features"
+        # print(len(train_words), len(train_roots), len(train_features[0]))
+        # print("words: {}, roots: {}, features: {}".format(train_words[:5], train_roots[:5], train_features[:5]))
+        train_size, val_size = [len(each) for each in [train_words, val_words]]
+        train_val_words, train_val_roots = [train_words + val_words, train_roots + val_roots]
+        train_val_features = [i+j for i,j in zip(train_features, val_features)]
+        train_data_generator = ProcessDataForModel(words=train_val_words, roots=train_val_roots,
+                                                   features=train_val_features)
 
-            all_inputs, all_outputs, max_word_len, n, phonetic_feature_num = train_data_generator.process_end_to_end()
-            params = read_path_configs('model_params.yaml')
-            model = _create_model(max_word_len, params['EMBED_DIM'], n, phonetic_feature_num)
+        all_inputs, all_outputs, max_word_len, n, phonetic_feature_num = train_data_generator.process_end_to_end()
+        params = read_path_configs('model_params.yaml')
+        model = _create_model(max_word_len, params['EMBED_DIM'], n, phonetic_feature_num)
 
-            train_inputs, val_inputs = split_train_val(all_inputs, train_size)
-            train_outputs, val_outputs = split_train_val(all_outputs, train_size)
-            hist = model.fit(train_inputs, train_outputs, validation_data=(val_inputs, val_outputs),
-                             batch_size = params['BATCH_SIZE'], epochs=params['EPOCHS'],
+        train_inputs, val_inputs = split_train_val(all_inputs, train_size)
+        train_outputs, val_outputs = split_train_val(all_outputs, train_size)
+        hist = model.fit(train_inputs, train_outputs, validation_data=(val_inputs, val_outputs),
+                         batch_size = params['BATCH_SIZE'], epochs=params['EPOCHS'],
+                         callbacks=[EarlyStopping(patience=10),
+                                    ModelCheckpoint(filepath= get_model_path(paths=paths),
+                                                    save_best_only=True,
+                                                    verbose=1, save_weights_only=True)
+                                    ])
+        if FREEZER_FLAG is True:
+            frozen_model = _create_model(max_word_len, params['EMBED_DIM'], n, phonetic_feature_num, freezing_call=True)
+            model.load_weights(get_model_path(paths=paths))
+            layers_to_be_frozen = get_frozen_layer_names()
+            for layer in model.layers:
+                frozen_model.get_layer(layer.name).set_weights(model.get_layer(layer.name).get_weights())
+            for layer_to_be_frozen in layers_to_be_frozen:
+                try:
+                    frozen_model.get_layer(layer_to_be_frozen).trainable = False
+                except KeyError:
+                    pass
+            frozen_model.compile(optimizer='adadelta', loss='categorical_crossentropy', metrics=['accuracy'])
+            hist = frozen_model.fit(train_inputs, train_outputs, validation_data=(val_inputs, val_outputs),
+                             batch_size=params['BATCH_SIZE'], epochs=params['EPOCHS'],
                              callbacks=[EarlyStopping(patience=10),
-                                        ModelCheckpoint(filepath= get_model_path(paths=paths),
+                                        ModelCheckpoint(filepath=get_model_path(paths=paths),
                                                         save_best_only=True,
                                                         verbose=1, save_weights_only=True)
                                         ])
-            if FREEZER_FLAG is True:
-                frozen_model = _create_model(max_word_len, params['EMBED_DIM'], n, phonetic_feature_num, freezing_call=True)
-                model.load_weights(get_model_path(paths=paths))
-                layers_to_be_frozen = get_frozen_layer_names()
-                for layer in model.layers:
-                    frozen_model.get_layer(layer.name).set_weights(model.get_layer(layer.name).get_weights())
-                for layer_to_be_frozen in layers_to_be_frozen:
-                    try:
-                        frozen_model.get_layer(layer_to_be_frozen).trainable = False
-                    except KeyError:
-                        pass
-                frozen_model.compile(optimizer='adadelta', loss='categorical_crossentropy', metrics=['accuracy'])
-                hist = frozen_model.fit(train_inputs, train_outputs, validation_data=(val_inputs, val_outputs),
-                                 batch_size=params['BATCH_SIZE'], epochs=params['EPOCHS'],
-                                 callbacks=[EarlyStopping(patience=10),
-                                            ModelCheckpoint(filepath=get_model_path(paths=paths),
-                                                            save_best_only=True,
-                                                            verbose=1, save_weights_only=True)
-                                            ])
-        elif MODE == 'test':
-            test_data_dir = paths['hdtb']['test']
-            contents = extract_word_root_and_feature.get_words_roots_and_features(
-                test_data_dir, n_features=FEATURE_NUMS
-            )
-            index_identifier = RemoveErroneousIndices(contents)
-            test_words, test_roots, test_features = index_identifier.remove_unknown_feature_labels()
-            test_data_generator = ProcessDataForModel(words=test_words, roots=test_roots,
-                                                       features=test_features)
+    elif MODE == 'test':
+        test_data_dir = paths[LANG][MODE]
+        contents = extract_word_root_and_feature.get_words_roots_and_features(
+            test_data_dir, n_features=FEATURE_NUMS, lang=LANG)
+        index_identifier = RemoveErroneousIndices(contents)
+        test_words, test_roots, test_features = index_identifier.remove_unknown_feature_labels()
+        test_data_generator = ProcessDataForModel(words=test_words, roots=test_roots,
+                                                   features=test_features)
 
-            all_inputs, all_outputs, max_word_len, n, phonetic_feature_num = test_data_generator.process_end_to_end()
+        all_inputs, all_outputs, max_word_len, n, phonetic_feature_num = test_data_generator.process_end_to_end()
+        params = read_path_configs('model_params.yaml')
+        model = _create_model(max_word_len, params['EMBED_DIM'], n, phonetic_feature_num)
+        model.load_weights(get_model_path(paths=paths))
+        pred_outputs = model.predict(all_inputs)
+
+        predicted_char_indices = np.argmax(pred_outputs[0], axis=2)
+        predicted_features = [np.argmax(each, axis=1) for each in pred_outputs[1:]]
+        _ = write_features_to_file(test_words, all_outputs[1:], predicted_features, paths['output_'+LANG])
+        root_outputs = write_roots_to_file(test_words, test_roots, predicted_char_indices, paths['output_'+LANG])
+        evaluator = evaluate_and_plot.EvaluatePerformance(test_words, root_outputs, all_outputs[1:], pred_outputs[1:],
+                                                          pickle_handler.pickle_loader('class_labels_transformed'+'_'+
+                                                                                       LANG))
+        _ = evaluator.p_r_curve_plotter(lang=LANG)
+
+    elif MODE == 'predict':
+        test_data_dir = paths[LANG+'_'+MODE+'_input']
+        sentences = extract_word_root_and_feature.get_words_for_predictions(test_data_dir)
+        predictions = list()
+        for sentence in sentences:
+            words_reversed = [item[::-1] for item in sentence]
+            X_indexed = process_words.get_indexed_words(words_reversed, mode='use_vocab', vocab_size=VOCAB_SIZE,
+                                                        lang=LANG)
+            input_shifter = process_words.ShiftWordsPerCW(X=words_reversed, cw=CONTEXT_WINDOW, vocab_size=VOCAB_SIZE,
+                                                          lang=LANG)
+            X_indexed_left, X_indexed_right = input_shifter.shift_input()
+            all_inputs = list()
+            all_inputs.append(X_indexed)
+            all_inputs += X_indexed_left
+            all_inputs += X_indexed_right
+            padded_indexed_inputs, max_word_len = pad_all_sequences(all_inputs)
+
+            n = pickle_handler.pickle_loader('num_of_indiv_features'+'_'+LANG)
+            decoder_input = get_decoder_input(padded_indexed_inputs[0])
+            padded_indexed_inputs.append(decoder_input)
+
+            num_of_optimized_features = list()
+            if PHONETIC_FLAG is True:
+                extractor = extract_phonetic_features.PhoneticFeatures(sentence)
+                features = extractor.get_features()
+                features = [word_feature[:FEATURE_NUMS] for word_feature in features]
+                tag_grouped_phonetic_features = [list(zip(*features))[idx] for idx in
+                                                 range(len(features[0]))]
+                _ = [padded_indexed_inputs.append(np.array(each)) for each in tag_grouped_phonetic_features]
+                num_of_optimized_features = [len(each) for each in features[0]]
+
             params = read_path_configs('model_params.yaml')
-            model = _create_model(max_word_len, params['EMBED_DIM'], n, phonetic_feature_num)
+            model = _create_model(max_word_len, params['EMBED_DIM'], n, num_of_optimized_features)
             model.load_weights(get_model_path(paths=paths))
-            pred_outputs = model.predict(all_inputs)
+            pred_outputs = model.predict(padded_indexed_inputs)
 
             predicted_char_indices = np.argmax(pred_outputs[0], axis=2)
             predicted_features = [np.argmax(each, axis=1) for each in pred_outputs[1:]]
-            _ = write_features_to_file(test_words, all_outputs[1:], predicted_features, paths['output'])
-            root_outputs = write_roots_to_file(test_words, test_roots, predicted_char_indices, paths['output'])
-            evaluator = evaluate_and_plot.EvaluatePerformance(test_words, root_outputs, all_outputs[1:], pred_outputs[1:],
-                                                              pickle_handler.pickle_loader('class_labels_transformed'))
-            _ = evaluator.p_r_curve_plotter()
-
-        elif MODE == 'predict':
-            test_data_dir = paths['hindi_test']
-            sentences = extract_word_root_and_feature.get_words_for_predictions(test_data_dir)
             predictions = list()
-            for sentence in sentences:
-                words_reversed = [item[::-1] for item in sentence]
-                X_indexed = process_words.get_indexed_words(words_reversed, mode='use_vocab', vocab_size=VOCAB_SIZE)
-                input_shifter = process_words.ShiftWordsPerCW(X=words_reversed, cw=CONTEXT_WINDOW, vocab_size=VOCAB_SIZE)
-                X_indexed_left, X_indexed_right = input_shifter.shift_input()
-                all_inputs = list()
-                all_inputs.append(X_indexed)
-                all_inputs += X_indexed_left
-                all_inputs += X_indexed_right
-                padded_indexed_inputs, max_word_len = pad_all_sequences(all_inputs)
+            predictions.append(predicted_char_indices)
+            predictions += predicted_features
+        _ = write_predicted_roots_and_features(sentences, predictions, paths['output_'+LANG])
 
-                n = pickle_handler.pickle_loader('num_of_indiv_features')
-                decoder_input = get_decoder_input(padded_indexed_inputs[0])
-                padded_indexed_inputs.append(decoder_input)
 
-                num_of_optimized_features = list()
-                if PHONETIC_FLAG is True:
-                    extractor = extract_phonetic_features.PhoneticFeatures(sentence)
-                    features = extractor.get_features()
-                    features = [word_feature[:FEATURE_NUMS] for word_feature in features]
-                    tag_grouped_phonetic_features = [list(zip(*features))[idx] for idx in
-                                                     range(len(features[0]))]
-                    _ = [padded_indexed_inputs.append(np.array(each)) for each in tag_grouped_phonetic_features]
-                    num_of_optimized_features = [len(each) for each in features[0]]
-
-                params = read_path_configs('model_params.yaml')
-                model = _create_model(max_word_len, params['EMBED_DIM'], n, num_of_optimized_features)
-                model.load_weights(get_model_path(paths=paths))
-                pred_outputs = model.predict(padded_indexed_inputs)
-
-                predicted_char_indices = np.argmax(pred_outputs[0], axis=2)
-                predicted_features = [np.argmax(each, axis=1) for each in pred_outputs[1:]]
-                predictions = list()
-                predictions.append(predicted_char_indices)
-                predictions += predicted_features
-            _ = write_predicted_roots_and_features(sentences, predictions, paths['output'])
-    else:
-        print("urdu")
 
 if __name__ == "__main__":
     main()
