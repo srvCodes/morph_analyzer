@@ -28,12 +28,16 @@ The file `main.py` takes the following command-line arguments:
 | phonetic | True/1/yes/y/t and False/0/no/n/f. | No (default=`False`) | Use MOO-driven phonological features or not. |
 | freezing | "       "      and "       " | No (default=`False`) | Use the [FreezeOut](https://arxiv.org/abs/1706.04983) training strategy or not. |
 
-`train` and `test` modes operate upon the standard train-test split specified by the HDTB and UDTB datasets (see `datasets` README) while `predict` uses the text provided manually in `src/hindi_predict_data/` and `src/urdu_predict_data/`.
+`train` and `test` modes operate upon the standard train-test split specified by the HDTB and UDTB datasets (see `datasets` [README](https://github.com/Saurav0074/morph_analyzer/blob/master/datasets/README.md) while `predict` uses the text provided manually in `src/hindi_predict_data/` and `src/urdu_predict_data/`.
 
-#### Sample run command: 
+#### Sample run commands: 
 
 ```python
->>> python main.py --lang urdu --mode train --phonetic true --freezing true
+>>> python main.py --lang urdu --mode train --phonetic true --freezing true #train
+
+>>> python main.py --lang urdu --mode test --phonetic true --freezing true #test
+
+>>> python main.py --lang urdu --mode predict --phonetic true --freezing true #predict
 ```
 
 For prediction, the plain text should be provided within `src/hindi_predict_data/test_data.txt` and `src/urdu_predict_data/test_data.txt`.
@@ -42,10 +46,10 @@ For prediction, the plain text should be provided within `src/hindi_predict_data
 
 For the test mode:
 
-- the gold and predicted roots as well as features are written to separate files within `output/roots.txt, feature_0.txt, ..., feature_6.txt`.
-- Micro-averaged precision-recall graphs are stored in `graph_outputs/`.
+- the predicted roots and features as well as their gold-labelled counterparts are written to separate files within `output/hindi/roots.txt, feature_0.txt, ..., feature_6.txt` or `output/urdu/roots.txt, feature_0.txt, ..., feature_6.txt`.
+- Micro-averaged precision-recall graphs are stored in `graph_outputs/hindi` and `graph_outputs/urdu`.
 
-For the predict mode, all the predictions (i.e., roots + features) are written to a single file - `output/predictions.txt`.
+For the predict mode, all the predictions (i.e., roots + features) are written to a single file - `output/urdu/predictions.txt`.
 
 ### Graph outputs for multi-objective optimization of phonological features
 
@@ -53,7 +57,6 @@ For the predict mode, all the predictions (i.e., roots + features) are written t
 
 ![moo](https://github.com/Saurav0074/morph_analyzer/blob/master/src/images/cubic-splines.png)
 
-Note: A complete yet unorganized codebase covering Urdu can be found [here](https://github.com/Saurav0074/mt-dma).
 
 # Citation
 
