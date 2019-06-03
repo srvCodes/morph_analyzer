@@ -23,20 +23,20 @@ The file `main.py` takes the following command-line arguments:
 
 | Argument | Values | Required | Specification |
 | ------- | ------- | ------------- | ------------ |
-| lang     | hindi, urdu (currently not supported) | Yes | Language |
-| mode     | train, test and predict (no gold labels required). | Yes |  Training, testing and predictions. |
+| lang     | hindi, urdu  | Yes | Language |
+| mode     | train, test and predict (i.e., no gold labels required). | Yes |  Training, testing and predictions. |
 | phonetic | True/1/yes/y/t and False/0/no/n/f. | No (default=`False`) | Use MOO-driven phonological features or not. |
 | freezing | "       "      and "       " | No (default=`False`) | Use the [FreezeOut](https://arxiv.org/abs/1706.04983) training strategy or not. |
 
-`train` and `test` modes operate upon the standard train-test split specified by the HDTB and UDTB datasets (see `datasets` README) while `predict` uses the text provided manually in `src/hindi/test_data.txt`.
+`train` and `test` modes operate upon the standard train-test split specified by the HDTB and UDTB datasets (see `datasets` README) while `predict` uses the text provided manually in `src/hindi_predict_data/` and `src/urdu_predict_data/`.
 
 #### Sample run command: 
 
 ```python
->>> python main.py --lang hindi --mode train --phonetic t --freezing t
+>>> python main.py --lang urdu --mode train --phonetic true --freezing true
 ```
 
-For prediction, the test sentences should be provided within `src/hindi/test_data.txt`.
+For prediction, the plain text should be provided within `src/hindi_predict_data/test_data.txt` and `src/urdu_predict_data/test_data.txt`.
 
 ### Outputs
 
