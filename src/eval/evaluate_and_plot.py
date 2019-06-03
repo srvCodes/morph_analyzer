@@ -8,6 +8,7 @@ from sklearn.metrics import precision_recall_curve
 from sklearn.preprocessing import label_binarize
 
 feature_cnt = 0
+feature_map = {0:'POS', 1:'gender', 2:'number', 3:'person', 4:'case', 5:'TAM'}
 
 class EvaluatePerformance():
     def __init__(self, words, root_outputs, orig_features, pred_features,  classes):
@@ -18,10 +19,10 @@ class EvaluatePerformance():
         self.words = words
 
 
-    def p_r_curve_plotter(self):
+    def p_r_curve_plotter(self, lang='hindi'):
         for orig, pred, list_of_classes in zip(self.orig_features, self.pred_features, self.classes):
             binarized_orig_features = self.binarize(orig, list_of_classes)
-            _ = self.plot_curve(binarized_orig_features, pred, list_of_classes)
+            _ = self.plot_curve(binarized_orig_features, pred, list_of_classes, lang=lang)
             # input()
 
     @staticmethod
@@ -30,7 +31,7 @@ class EvaluatePerformance():
         return res
 
     @staticmethod
-    def plot_curve(Y, f, c):
+    def plot_curve(Y, f, c, lang='hindi'):
         precision = dict()
         recall = dict()
         average_precision = dict()
@@ -92,7 +93,7 @@ class EvaluatePerformance():
         plt.title('Extension of Precision-Recall curve to multi-class')
         plt.legend(lines, labels, loc=(0, -.38), prop=dict(size=14))
         global feature_cnt
-        plt.savefig('graph_outputs/feature_' + str(feature_cnt))
+        plt.savefig('graph_outputs/'+lang+'/' + feature_map[feature_cnt] + '_curve')
         feature_cnt += 1
         plt.show()
 
