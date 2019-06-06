@@ -319,10 +319,12 @@ def main():
     if MODE == 'train':
         train_data_dir = paths[LANG][MODE]
         train_words, train_roots, train_features = \
-            extract_word_root_and_feature.get_words_roots_and_features(train_data_dir, n_features=FEATURE_NUMS, lang=LANG)
+            extract_word_root_and_feature.get_words_roots_and_features(train_data_dir, n_features=FEATURE_NUMS,
+                                                                       lang=LANG, get_stats=False)
         val_data_dir = paths[LANG]['validation']
         val_words, val_roots, val_features = \
-            extract_word_root_and_feature.get_words_roots_and_features(val_data_dir, n_features=FEATURE_NUMS, lang=LANG)
+            extract_word_root_and_feature.get_words_roots_and_features(val_data_dir, n_features=FEATURE_NUMS,
+                                                                       lang=LANG, get_stats=False)
         assert len(train_words) == len(train_roots) == len(train_features[1]), \
             "Length mismatch while flattening train features"
         assert len(val_words) == len(val_roots) == len(val_features[1]),\
@@ -369,8 +371,8 @@ def main():
                                         ])
     elif MODE == 'test':
         test_data_dir = paths[LANG][MODE]
-        contents = extract_word_root_and_feature.get_words_roots_and_features(
-            test_data_dir, n_features=FEATURE_NUMS, lang=LANG)
+        contents = extract_word_root_and_feature.get_words_roots_and_features(test_data_dir, n_features=FEATURE_NUMS,
+                                                                              lang=LANG, get_stats=False)
         index_identifier = RemoveErroneousIndices(contents)
         test_words, test_roots, test_features = index_identifier.remove_unknown_feature_labels()
         test_data_generator = ProcessDataForModel(words=test_words, roots=test_roots,
