@@ -86,6 +86,7 @@ def get_words_roots_and_features(path, n_features, lang='hindi', get_stats=False
         print(f"Data set stats: \n Total no. of sentences: {stats[0][0]}\n"
               f"Mean length of sentences: {stats[0][1]}\n"
               f"Total no. of words: {stats[1][0]}, Unique words: {stats[1][1]}\n,"
+              f"Total ambiguous words: {stats[1][2]}, Unambiguous words: {stats[1][3]}\n,"
               f"Total unique tokens for six tags: {stats[2]}")
         exit(1)
     return all_words, all_roots, indiv_features

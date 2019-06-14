@@ -3,7 +3,7 @@ from itertools import cycle
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.externals.funcsigs import signature
-from sklearn.metrics import average_precision_score
+from sklearn.metrics import average_precision_score, accuracy_score
 from sklearn.metrics import precision_recall_curve
 from sklearn.preprocessing import label_binarize
 
@@ -43,8 +43,7 @@ class EvaluatePerformance():
                                                                         f.ravel())
         average_precision["micro"] = average_precision_score(Y, f,
                                                              average="micro")
-        print('Average precision score, micro-averaged over all classes: {0:0.2f}'
-              .format(average_precision["micro"]))
+        print(f'Average precision score, micro-averaged over all classes: {average_precision["micro"]}')
         # Plot average precision_recall_curve
         plt.figure()
         # In matplotlib < 1.5, plt.fill_between does not have a 'step' argument
