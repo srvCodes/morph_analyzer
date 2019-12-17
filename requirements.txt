@@ -4,7 +4,7 @@ Keras-Applications==1.0.4
 Keras-Preprocessing==1.0.2
 matplotlib==2.2.2
 numpy==1.14.3
-PyYAML==3.12
+PyYAML==5.1
 scikit-learn==0.19.1
 tensorflow==1.15.0
 tensorflow-gpu==1.10.0
